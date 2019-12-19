@@ -1,0 +1,48 @@
+import os
+import pandas as pd
+
+configfile: "config.yaml"
+
+''' Load from config '''
+LABEL = config['LABEL']
+READS1 = config['READS1']
+READS2 = config['READS2']
+ALN_MAPQ_THRSD = config['ALN_MAPQ_THRSD']
+DIR = config['DIR']
+GENOME = config['GENOME']
+DIR_SECONDPASS_GENOMES = config['DIR_SECONDPASS_GENOMES']
+SECONDPASS_GENOMES = config['SECONDPASS_GENOMES']
+BCFTOOLS = config['BCFTOOLS']
+# LIFTOVER = config['LIFTOVER']
+PYTHON = config['PYTHON']
+DIR_SCRIPTS = config['DIR_SCRIPTS']
+# TIME = config['TIME']
+THREADS = config['THREADS']
+RAND_SEED = config['RAND_SEED']
+
+MAJOR_IDX = config['MAJOR_IDX']
+''''''
+
+BT2_IDX_EXT = ['.1', '.2', '.3', '.4', '.rev.1', '.rev.2']
+
+GENOME_BASENAME_NOEXT = os.path.splitext(os.path.basename(GENOME))[0]
+GENOME_IDX_PREFIX = os.path.join(DIR, 'data/bt2_indexes/' + GENOME_BASENAME_NOEXT)
+DIR_SECONDPASS_GENOME_IDX = os.path.join(DIR, 'data/bt2_indexes/')
+
+DIR_FIRST_PASS = os.path.join(DIR, 'alignments/' + LABEL)
+
+''' Included rules '''
+# Index genomes
+#   check: 'index.done'
+include: 'shared/index.Snakefile'
+# Align reads
+#   check: 'align.done'
+include: 'shared/align.Snakefile'
+
+rule all:
+    input:
+        index = os.path.join(DIR, 'index.done'),
+        align = os.path.join(DIR, 'align.done')
+    run:
+        sys.stderr.write('Reference flow run is finished.\n')
+
