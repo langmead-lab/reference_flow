@@ -50,7 +50,6 @@ rule filter_phased_vcf:
     input:
         vcf = PHASED_VCF,
         chrom_map = CHROM_MAP
-        # chrom_map = os.path.join(DIR, 'GRCh38.chrom_map')
     output:
         vcf = PHASED_VCF_F
     shell:
