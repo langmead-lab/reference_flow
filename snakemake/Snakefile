@@ -1,0 +1,239 @@
+import os
+import pandas as pd
+
+configfile: "config.yaml"
+
+''' Load from config '''
+CHROM = config['CHROM']
+INDIV = config['INDIV']
+READS1 = config['READS1']
+GROUP = config['GROUP']
+ALN_MAPQ_THRSD = config['ALN_MAPQ_THRSD']
+POP_THRSD = config['POP_THRSD']
+POP_STOCHASTIC = config['POP_STOCHASTIC']
+POP_BLOCK_SIZE = config['POP_BLOCK_SIZE']
+POP_USE_LD = config['POP_USE_LD']
+BIAS_MIN_READ_COUNT = config['BIAS_MIN_READ_COUNT']
+BIAS_TAIL_THRDS = config['BIAS_TAIL_THRDS']
+
+DIR = config['DIR']
+GENOME = config['GENOME']
+DIR_VCF = config['DIR_VCF']
+LENGTH_MAP = config['LENGTH_MAP']
+CHROM_MAP = config['CHROM_MAP']
+
+FAMILY = config['FAMILY']
+SPOP = config['SPOP']
+BCFTOOLS = config['BCFTOOLS']
+SAMTOOLS = config['SAMTOOLS']
+BEDTOOLS = config['BEDTOOLS']
+LIFTOVER = config['LIFTOVER']
+PYTHON = config['PYTHON']
+DIR_SCRIPTS = config['DIR_SCRIPTS']
+TIME = config['TIME']
+THREADS = config['THREADS']
+RAND_SEED = config['RAND_SEED']
+MAX_NUM_READS_FOR_MERGING = config['MAX_NUM_READS_FOR_MERGING']
+''''''
+
+PREFIX_VCF_F = os.path.join(DIR, '{CHROM}_filtered')
+PREFIX_MAJOR_F = os.path.join(DIR, 'major/{CHROM}_filtered_major')
+PREFIX_MAJOR = os.path.join(DIR, 'major/chr{CHROM}_maj')
+DIR_MAJOR = os.path.join(DIR, 'major')
+
+DIR_FIRST_PASS = os.path.join(DIR, 'experiments/' + INDIV + '/')
+
+DIR_POP_GENOME = os.path.join(DIR, 'pop_genome/')
+POP_DIRNAME = 'thrds{0}_S{1}_b{2}_ld{3}'.format(POP_THRSD, POP_STOCHASTIC, POP_BLOCK_SIZE, POP_USE_LD)
+POP_GENOME_SUFFIX = \
+    'chr{CHROM}-superpop_{GROUP}_thrds' + str(POP_THRSD) + \
+    '_S' + str(POP_STOCHASTIC) + '_b' + str(POP_BLOCK_SIZE) + \
+    '_ld' + str(POP_USE_LD)
+WG_POP_GENOME_SUFFIX = \
+    'wg-superpop_{GROUP}_thrds' + str(POP_THRSD) + \
+    '_S' + str(POP_STOCHASTIC) + '_b' + str(POP_BLOCK_SIZE) + \
+    '_ld' + str(POP_USE_LD)
+DIR_POP_GENOME_BLOCK = os.path.join(DIR_POP_GENOME, POP_DIRNAME + '/')
+DIR_POP_GENOME_BLOCK_IDX = os.path.join(DIR_POP_GENOME_BLOCK, 'indexes/')
+
+DIR_PER = os.path.join(DIR, 'personalized/{INDIV}/')
+
+DIR_FIRST_PASS = os.path.join(DIR, 'experiments/{INDIV}/')
+DIR_SECOND_PASS = os.path.join(DIR, 'experiments/{INDIV}/' + POP_DIRNAME)
+PREFIX_SECOND_PASS = os.path.join(DIR_SECOND_PASS, 'wg-major-' + ALN_MAPQ_THRSD + '-{GROUP}-' + POP_DIRNAME)
+
+DIR_VG = os.path.join(DIR, 'vg/')
+DIR_VG_TMP = os.path.join(DIR, 'vg/tmp/')
+
+DIR_RESULTS_BIAS = os.path.join(DIR, 'results/bias')
+
+IDX_ITEMS = ['1', '2', '3', '4', 'rev.1', 'rev.2']
+
+include: '../snakemake/shared/functions.Snakefile'
+
+#: Prepare pop genome and indexes
+#:      check: 'prepare_pop_genome.done'
+include: 'shared/prepare_pop_genome.Snakefile'
+
+#: Prepare grc and major genome and indexes
+#:      check: 'prepare_standard_genome.done'
+include: 'shared/prepare_standard_genome.Snakefile'
+
+#: Align reads to grch major, reference flow, personalized genomes
+#:      check: 'alignment_standard.done', 'alignment_refflow.done'
+include: 'shared/alignment.Snakefile'
+
+rule all:
+    input:
+        #: Building genomes
+        pop_genome = os.path.join(DIR, 'prepare_pop_genome.done'),
+        standard_genome = os.path.join(DIR, 'prepare_standard_genome.done'),
+        #    #: alignment check files
+        #    align_standard = os.path.join(DIR, 'alignment_standard.done'),
+        align_refflow = os.path.join(DIR, 'alignment_refflow.done'),
+        #    #: vcf preparation
+        #    het_no_overlaps = expand(os.path.join(DIR, 'wg_{INDIV}_het_no_overlaps.vcf'), INDIV = INDIV),
+        #    #: sort SAMs (this is after liftover)
+        sorting = os.path.join(DIR, 'sorting.done'),
+
+rule filter_vcf:
+    input:
+        vcf = os.path.join(DIR_VCF, 'ALL.chr{CHROM}.shapeit2_integrated_snvindels_v2a_27022019.GRCh38.phased.vcf.gz'),
+        chrom_map = CHROM_MAP
+    output:
+        vcf = PREFIX_VCF_F + '.vcf'
+    shell:
+        '{BCFTOOLS} view -c 1 -f PASS -V mnps,other {input.vcf} | {BCFTOOLS} annotate --rename-chrs {input.chrom_map} -o {output.vcf}'
+
+rule prepare_chrom_genome:
+    input:
+        genome = GENOME
+    output:
+        os.path.join(DIR, 'chr{CHROM}.fa')
+    shell:
+        '{SAMTOOLS} faidx {input.genome} chr{wildcards.CHROM} > {output};'
+
+rule aggregate_vcf:
+    input:
+        vcf = expand(os.path.join(DIR, '{CHROM}_filtered.vcf'), CHROM = CHROM)
+    output:
+        vcf = os.path.join(DIR, 'wg_filtered.vcf')
+    shell:
+        '{BCFTOOLS} concat -o {output.vcf} {input.vcf}'
+
+rule liftover_serialize_major:
+    input:
+        vcf_major = os.path.join(DIR, 'major/wg-maj.vcf'),
+        length_map = LENGTH_MAP
+    output:
+        lft = os.path.join(DIR_MAJOR, 'wg-major.lft')
+    params:
+        os.path.join(DIR_MAJOR, 'wg-major')
+    shell:
+        '{LIFTOVER} serialize -v {input.vcf_major} -p {params} -k {input.length_map}'
+
+rule liftover_serialize_pop_genome:
+    input:
+        vcf = os.path.join(DIR_POP_GENOME, POP_DIRNAME + '/' +
+            'wg-superpop_{GROUP}_' + POP_DIRNAME  + '.vcf'),
+        length_map = LENGTH_MAP
+    output:
+        lft = os.path.join(
+            DIR_POP_GENOME, POP_DIRNAME + '/' +
+            'wg-superpop_{GROUP}_' + POP_DIRNAME + '.lft')
+    params:
+        os.path.join(
+            DIR_POP_GENOME, POP_DIRNAME + '/' +
+            'wg-superpop_{GROUP}_' + POP_DIRNAME)
+    run:
+        shell('{LIFTOVER} serialize -v {input.vcf} -p {params} -k {input.length_map}')
+
+rule liftover_lift_major_highq:
+    input:
+        sam = os.path.join(DIR_FIRST_PASS, 'wg-major-mapqgeq{}.sam'.format(ALN_MAPQ_THRSD)),
+        lft = os.path.join(DIR_MAJOR, 'wg-major.lft'),
+        vcf_major = os.path.join(DIR, 'major/wg-maj.vcf')
+    output:
+        os.path.join(DIR_FIRST_PASS, 'wg-major-mapqgeq{}-liftover.sam'.format(ALN_MAPQ_THRSD))
+    params:
+        os.path.join(DIR_FIRST_PASS, 'wg-major-mapqgeq{}-liftover'.format(ALN_MAPQ_THRSD))
+    run:
+        shell('{LIFTOVER} lift -a {input.sam} -l {input.lft} -p {params}')
+
+#: Refflow -- second pass
+rule liftover_lift_refflow_secondpass_and_merge:
+    input:
+        maj_fp = os.path.join(DIR_FIRST_PASS, 'wg-major-mapqgeq{}-liftover.sam'.format(ALN_MAPQ_THRSD)),
+        second_sam_path = os.path.join(DIR_SECOND_PASS, 'wg-major-{}-{}.merge_paths'.format(ALN_MAPQ_THRSD, POP_DIRNAME)),
+        lft_pop = expand(os.path.join(
+            DIR_POP_GENOME, POP_DIRNAME + '/' +
+            'wg-superpop_{GROUP}_' + POP_DIRNAME + '.lft'),
+            GROUP = GROUP),
+        vcf_pop = expand(os.path.join(
+            DIR_POP_GENOME, POP_DIRNAME + '/' +
+            'wg-superpop_{GROUP}_' + POP_DIRNAME  + '.vcf'),
+            GROUP = GROUP),
+        lft_maj = os.path.join(DIR_MAJOR, 'wg-major.lft'),
+        vcf_major = os.path.join(DIR_MAJOR, 'wg-maj.vcf')
+    output:
+        lfted_refflow_sam = os.path.join(DIR_SECOND_PASS,
+            'wg-refflow-{}-{}-liftover.sam'.format(ALN_MAPQ_THRSD, POP_DIRNAME)),
+        lfted_major_second_sam = os.path.join(DIR_SECOND_PASS, '2ndpass-maj-liftover.sam'),
+        lfted_group_second_sam = [
+            os.path.join(DIR_SECOND_PASS, '2ndpass-') + 
+            g + '-liftover.sam' for g in GROUP]
+    run:
+        list_sam = []
+        list_group = []
+        #: files should be 
+        #: DIR + '/experiments/{INDIV}/{POP_DIRNAME}/2ndpass-{}.sam'
+        #: where g should be {GROUP} + 'maj'
+        with open(input.second_sam_path, 'r') as f:
+            for line in f:
+                list_sam.append(line.rstrip())
+                bn = os.path.basename(line)
+                split_bn = os.path.splitext(bn)
+                list_group.append(split_bn[0].split('-')[-1])
+        for i, s in enumerate(list_sam):
+            sys.stderr.write('sam={}, group = {}\n'.format(s, list_group[i]))
+        
+        #: copy lifted first pass sam 
+        shell('cp {input.maj_fp} {output.lfted_refflow_sam};')
+        for i in range(len(list_sam)):
+            sam = list_sam[i]
+            prefix = os.path.join(DIR,
+                'experiments/' + wildcards.INDIV + '/' + POP_DIRNAME + 
+                '/2ndpass-{}-liftover'.format(list_group[i]))
+            if list_group[i] == 'maj':
+                sys.stderr.write('sam={}, lft = {}\n'.format(sam, input.lft_maj))
+                shell('{LIFTOVER} lift -a {sam} -l {input.lft_maj} -p {prefix};')
+                #: append reads to all-in-one lifted SAM
+                shell('grep -hv "^@" {prefix}.sam >> {output.lfted_refflow_sam};')
+            elif list_group[i] in GROUP:
+                for lft in input.lft_pop:
+                    pop = os.path.basename(lft)
+                    if lft.count(list_group[i]) > 0:
+                        break
+                sys.stderr.write('sam={}, lft = {}\n'.format(sam, lft))
+                shell('{LIFTOVER} lift -a {sam} -l {lft} -p {prefix};')
+                #: append reads to all-in-one lifted SAM
+                shell('grep -hv "^@" {prefix}.sam >> {output.lfted_refflow_sam};')
+
+rule sort_refflow:
+    input:
+        os.path.join(DIR_SECOND_PASS,
+            'wg-refflow-{}-{}-liftover.sam'.format(ALN_MAPQ_THRSD, POP_DIRNAME))
+    output:
+        os.path.join(DIR_SECOND_PASS,
+            'wg-refflow-{}-{}-liftover-sorted.bam'.format(ALN_MAPQ_THRSD, POP_DIRNAME))
+    threads: 4
+    run:
+        shell('samtools sort -@ {threads} -o {output} -O BAM {input};')
+
+rule check_sort:
+    input:
+        expand(os.path.join(DIR_SECOND_PASS,
+            'wg-refflow-{}-{}-liftover-sorted.bam'.format(ALN_MAPQ_THRSD, POP_DIRNAME)), INDIV = INDIV),
+    output:
+        touch(temp(os.path.join(DIR, 'sorting.done')))
+

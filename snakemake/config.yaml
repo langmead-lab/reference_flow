@@ -1,0 +1,43 @@
+CHROM : ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', 'X', 'Y']
+GROUP : ['EUR', 'AMR', 'EAS', 'SAS', 'AFR']
+ALN_MAPQ_THRSD : '10'
+
+POP_THRSD : 0
+POP_STOCHASTIC : 1
+POP_BLOCK_SIZE : 1000
+POP_USE_LD : 1
+
+BIAS_MIN_READ_COUNT : 15
+BIAS_TAIL_THRDS : 0.3
+
+DIR: 'run'
+# DIR: '/net/langmead-bigmem-ib.bluecrab.cluster/storage2/naechyun/refflow/wg_hg38_2'
+# DIR_VCF : '/scratch/groups/blangme2/cdarby/20190312_biallelic_SNV_and_INDEL'
+DIR_VCF : '/work-zfs/blangme2/naechyun/20190312_biallelic_SNV_and_INDEL'
+GENOME : '/scratch/groups/blangme2/igenomes/Homo_sapiens/UCSC/hg38/Sequence/WholeGenomeFasta/genome.fa'
+
+INDIV : 'NA12878'
+READS1 : '../test/SRR622457_1-1k.fastq'
+FAMILY : '../resources/20130606_g1k.ped'
+SPOP : '../resources/1kg.superpopulation'
+LENGTH_MAP : '../resources/GRCh38.length_map'
+CHROM_MAP : '../resources/GRCh38.chrom_map'
+# READS1 : '/net/langmead-bigmem-ib.bluecrab.cluster/storage/naechyun/1000Genomes/SRR622457/fastq/SRR622457_1.fastq'
+# FAMILY : '/net/langmead-bigmem-ib.bluecrab.cluster/storage/naechyun/relaxation/20130606_g1k.ped'
+# SPOP : '/net/langmead-bigmem-ib.bluecrab.cluster/storage/naechyun/relaxation/1kg.superpopulation'
+# LENGTH_MAP : '/net/langmead-bigmem-ib.bluecrab.cluster/storage2/naechyun/genome_relaxation/snakemake38/GRCh38.length_map'
+# CHROM_MAP : '/net/langmead-bigmem-ib.bluecrab.cluster/storage2/naechyun/genome_relaxation/snakemake38/GRCh38.chrom_map'
+
+BCFTOOLS : '/home-1/cnaechy1@jhu.edu/bin/bcftools'
+SAMTOOLS : '/home-1/cnaechy1@jhu.edu/miniconda3/envs/env_3.7_tiny/bin/samtools'
+BEDTOOLS : '/software/apps/bedtools/2.27.0/bin/bedtools'
+LIFTOVER : '/net/langmead-bigmem-ib.bluecrab.cluster/storage2/naechyun/liftover/liftover' #: latest version
+PYTHON : '/home-1/cnaechy1@jhu.edu/miniconda3/bin/python3.7'
+DIR_SCRIPTS : '../src'
+# DIR_SCRIPTS : '/net/langmead-bigmem-ib.bluecrab.cluster/storage2/naechyun/genome_relaxation/scripts'
+
+TIME : '/home-1/cnaechy1@jhu.edu/bin/time-1.9'
+THREADS : 16
+# THREADS : 40
+RAND_SEED : 0
+MAX_NUM_READS_FOR_MERGING : 100000000
