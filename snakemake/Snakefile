@@ -13,8 +13,6 @@ POP_THRSD = config['POP_THRSD']
 POP_STOCHASTIC = config['POP_STOCHASTIC']
 POP_BLOCK_SIZE = config['POP_BLOCK_SIZE']
 POP_USE_LD = config['POP_USE_LD']
-BIAS_MIN_READ_COUNT = config['BIAS_MIN_READ_COUNT']
-BIAS_TAIL_THRDS = config['BIAS_TAIL_THRDS']
 
 DIR = config['DIR']
 GENOME = config['GENOME']
@@ -26,14 +24,12 @@ FAMILY = config['FAMILY']
 SPOP = config['SPOP']
 BCFTOOLS = config['BCFTOOLS']
 SAMTOOLS = config['SAMTOOLS']
-BEDTOOLS = config['BEDTOOLS']
 LIFTOVER = config['LIFTOVER']
 PYTHON = config['PYTHON']
 DIR_SCRIPTS = config['DIR_SCRIPTS']
-TIME = config['TIME']
+
 THREADS = config['THREADS']
 RAND_SEED = config['RAND_SEED']
-MAX_NUM_READS_FOR_MERGING = config['MAX_NUM_READS_FOR_MERGING']
 ''''''
 
 PREFIX_VCF_F = os.path.join(DIR, '{CHROM}_filtered')
