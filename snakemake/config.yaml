@@ -20,10 +20,10 @@ POP_BLOCK_SIZE : 1000
 POP_USE_LD : 1
 
 ### Independent-sampling stochastic update
-POP_THRSD : 0
-POP_STOCHASTIC : 1
-POP_BLOCK_SIZE : 1
-POP_USE_LD : 0
+#  POP_THRSD : 0
+#  POP_STOCHASTIC : 1
+#  POP_BLOCK_SIZE : 1
+#  POP_USE_LD : 0
 
 ###  Deterministic major ###
 #  POP_THRSD : 0.5
@@ -34,8 +34,6 @@ POP_USE_LD : 0
 DIR: 'run'
 DIR_VCF : '../resources/1kg_vcf'
 GENOME : '../resources/GCA_000001405.15_GRCh38_no_alt_analysis_set.fna'
-# DIR_VCF : '/work-zfs/blangme2/naechyun/20190312_biallelic_SNV_and_INDEL'
-# GENOME : '/scratch/groups/blangme2/igenomes/Homo_sapiens/UCSC/hg38/Sequence/WholeGenomeFasta/genome.fa'
 
 INDIV : 'NA12878'
 READS1 : '../test/SRR622457_1-1k.fastq'
@@ -46,7 +44,8 @@ CHROM_MAP : '../resources/GRCh38.chrom_map'
 
 BCFTOOLS : 'bcftools' # there is a bug with `bcftools consensus` in v1.9, so we recommend using the latest version
 SAMTOOLS : 'samtools'
-LIFTOVER : '/net/langmead-bigmem-ib.bluecrab.cluster/storage2/naechyun/liftover/liftover' #: latest version
+LIFTOVER : '../liftover/liftover'
+# LIFTOVER : '/net/langmead-bigmem-ib.bluecrab.cluster/storage2/naechyun/liftover/liftover' #: latest version
 PYTHON : 'python'
 DIR_SCRIPTS : '../src'
 
