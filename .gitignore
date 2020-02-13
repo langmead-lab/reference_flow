@@ -1,2 +1,4 @@
 snakemake/run/
 **/*.vcf.gz
+resources/GCA_000001405.15_GRCh38_no_alt_analysis_set.fna*
+resources/20130606_g1k.ped
