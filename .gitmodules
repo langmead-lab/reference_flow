@@ -1,0 +1,3 @@
+[submodule "liftover"]
+	path = liftover
+	url = git@github.com:alshai/liftover.git
