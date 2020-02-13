@@ -37,7 +37,7 @@ Users may choose other reference genomes of interest by changing the `GENOME` pa
 [Population information for 1000 Genomes Project individuals](https://www.internationalgenome.org/faq/which-samples-are-you-sequencing/) can be downloaded by running the script:
 
 ```
-sh resources/download_1kg_pop_table.sh
+sh src/download_1kg_pop_table.sh
 ```
 
 ### Liftover
