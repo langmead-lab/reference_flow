@@ -28,9 +28,13 @@ sh src/download_genome.sh
 
 Users may choose other reference genomes of interest by changing the `GENOME` parameter in `snakemake/config.yaml`.
 
-### GRCh38 call sets from the 1000 Genomes Project
+### Download GRCh38 call sets from the 1000 Genomes Project
 
-#todo
+[The 1000 Genomes Project GRCh38 call sets with SNVs and indels](https://www.internationalgenome.org/announcements/Variant-calls-from-1000-Genomes-Project-data-on-the-GRCh38-reference-assemlby/) can be downloaded using script:
+
+```
+sh src/download_1kg_vcf.sh
+```
 
 ### Download 1000 Genomes Project population table
 
