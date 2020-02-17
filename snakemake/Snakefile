@@ -32,13 +32,18 @@ THREADS = config['THREADS']
 RAND_SEED = config['RAND_SEED']
 ''''''
 
+# Prefixes for filtered VCFs
 PREFIX_VCF_F = os.path.join(DIR, '{CHROM}_filtered')
+
+# Bowtie 2 index extensions
+IDX_ITEMS = ['1', '2', '3', '4', 'rev.1', 'rev.2']
+
+# Prefixes and directory paths for major-allele reference contruction and indexing
 PREFIX_MAJOR_F = os.path.join(DIR, 'major/{CHROM}_filtered_major')
 PREFIX_MAJOR = os.path.join(DIR, 'major/chr{CHROM}_maj')
 DIR_MAJOR = os.path.join(DIR, 'major')
 
-DIR_FIRST_PASS = os.path.join(DIR, 'experiments/' + INDIV + '/')
-
+# Prefixes and directory paths for population reference contruction and indexing
 DIR_POP_GENOME = os.path.join(DIR, 'pop_genome/')
 POP_DIRNAME = 'thrds{0}_S{1}_b{2}_ld{3}'.format(POP_THRSD, POP_STOCHASTIC, POP_BLOCK_SIZE, POP_USE_LD)
 POP_GENOME_SUFFIX = \
@@ -52,19 +57,16 @@ WG_POP_GENOME_SUFFIX = \
 DIR_POP_GENOME_BLOCK = os.path.join(DIR_POP_GENOME, POP_DIRNAME + '/')
 DIR_POP_GENOME_BLOCK_IDX = os.path.join(DIR_POP_GENOME_BLOCK, 'indexes/')
 
-DIR_PER = os.path.join(DIR, 'personalized/{INDIV}/')
-
+# Prefix and directory paths for experiments
 DIR_FIRST_PASS = os.path.join(DIR, 'experiments/{INDIV}/')
 DIR_SECOND_PASS = os.path.join(DIR, 'experiments/{INDIV}/' + POP_DIRNAME)
 PREFIX_SECOND_PASS = os.path.join(DIR_SECOND_PASS, 'wg-major-' + ALN_MAPQ_THRSD + '-{GROUP}-' + POP_DIRNAME)
 
-DIR_VG = os.path.join(DIR, 'vg/')
-DIR_VG_TMP = os.path.join(DIR, 'vg/tmp/')
-
+# Bias results directory
 DIR_RESULTS_BIAS = os.path.join(DIR, 'results/bias')
 
-IDX_ITEMS = ['1', '2', '3', '4', 'rev.1', 'rev.2']
-
+''' Snakemake modules '''
+# Functions
 include: '../snakemake/shared/functions.Snakefile'
 
 # Prepare pop genome and indexes
@@ -83,6 +85,8 @@ include: 'shared/alignment.Snakefile'
 #      check: 'sorting.done'
 include: 'shared/elevate_and_sort.Snakefile'
 
+
+''' Snakemake rules '''
 rule all:
     input:
         # Building genomes
@@ -102,14 +106,6 @@ rule filter_vcf:
     shell:
         '{BCFTOOLS} view -c 1 -f PASS -V mnps,other {input.vcf} | {BCFTOOLS} annotate --rename-chrs {input.chrom_map} -o {output.vcf}'
 
-rule prepare_chrom_genome:
-    input:
-        genome = GENOME
-    output:
-        os.path.join(DIR, 'chr{CHROM}.fa')
-    shell:
-        '{SAMTOOLS} faidx {input.genome} chr{wildcards.CHROM} > {output};'
-
 rule aggregate_vcf:
     input:
         vcf = expand(os.path.join(DIR, '{CHROM}_filtered.vcf'), CHROM = CHROM)
@@ -118,3 +114,10 @@ rule aggregate_vcf:
     shell:
         '{BCFTOOLS} concat -o {output.vcf} {input.vcf}'
 
+rule prepare_chrom_genome:
+    input:
+        genome = GENOME
+    output:
+        os.path.join(DIR, 'chr{CHROM}.fa')
+    shell:
+        '{SAMTOOLS} faidx {input.genome} chr{wildcards.CHROM} > {output};'
