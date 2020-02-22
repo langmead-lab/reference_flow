@@ -5,7 +5,7 @@ reads with a number of reference genomes built with population genomic informati
 
 The preprint will be posted on bioRxiv.
 
-The experiments we've done are provided in the [Reference Flow Experiments repoxsitory](https://github.com/langmead-lab/reference_flow-experiments).
+The experiments we've done are provided in the [Reference Flow Experiments repository](https://github.com/langmead-lab/reference_flow-experiments).
 
 ## Preparation
 
