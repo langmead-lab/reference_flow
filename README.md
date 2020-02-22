@@ -1,10 +1,11 @@
-# Reference flow
+# Reference Flow
 
 Reference flow is a computational genomics pipeline to align short sequencing 
 reads with a number of reference genomes built with population genomic information included.
 
 The preprint will be posted on bioRxiv.
 
+The experiments we've done are provided in the [Reference Flow Experiments repoxsitory](https://github.com/langmead-lab/reference_flow-experiments).
 
 ## Preparation
 
