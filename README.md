@@ -39,7 +39,7 @@ sh src/download_1kg_vcf.sh
 
 ### Download 1000 Genomes Project population table
 
-[Population information for 1000 Genomes Project individuals](https://www.internationalgenome.org/faq/which-samples-are-you-sequencing/) can be downloaded by running the script:
+[Population information for the 1000 Genomes Project individuals](https://www.internationalgenome.org/faq/which-samples-are-you-sequencing/) can be downloaded by running the script:
 
 ```
 sh src/download_1kg_pop_table.sh
@@ -53,7 +53,14 @@ Please refer to the [liftover github page](https://github.com/alshai/liftover) t
 
 ## Reference flow configuration
 
-Parameters for reference flow are specified in `snakemake/config.yaml`.
+Parameters for reference flow are specified in `snakemake/config.yaml` and described [here](snakemake/README.md).
+
+By default we use GRCh38 and the GRCh38 call set from the 1000 Genomes Project. 
+Users may switch to another reference genome, not limited to human's, easily by changing the `GENOME` parameter in the config file.
+
+Users may switch to the 1KG phase-3 call set by using the corresponding VCFs in `DIR_VCF`.
+For now we only tested on call sets provided by the 1000 Genomes Project. 
+Call sets provided by other studies may differ slightly in population labelling and VCF format, causing the pipeline not working properly.
 
 ## Running reference flow
 
