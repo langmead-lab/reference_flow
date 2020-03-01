@@ -262,11 +262,13 @@ def update_genome(
             alts = row[4].split(',')
 
             if is_ld:
-                alleles = row[col].split('|')
+                alleles = row[col].split(':')[0].split('|')
+                # alleles = row[col].split('|')
                 alleleA = int(alleles[ld_hap])
                 alleleB = 0
             elif indiv != None:
-                alleles = row[col].split('|')
+                alleles = row[col].split(':')[0].split('|')
+                # alleles = row[col].split('|')
                 alleleA = int(alleles[0])
                 alleleB = int(alleles[1])
             else:
