@@ -1,0 +1,74 @@
+# Genomic reads to process
+READS1 : '/net/langmead-bigmem-ib.bluecrab.cluster/storage2/naechyun/mouse_snp/SM_J-1M.fq'
+
+# Name of the tested sample
+INDIV : 'SM_J'
+
+# Directory where the outputs will be put
+DIR: 'run_mouse'
+
+# Number of threads used
+THREADS : 16
+
+# Directory where the 1KG VCFs are put
+DIR_VCF : '/net/langmead-bigmem-ib.bluecrab.cluster/storage2/naechyun/mouse_snp/'
+VCF : ['/net/langmead-bigmem-ib.bluecrab.cluster/storage2/naechyun/mouse_snp/mgp.v5.merged.indels.dbSNP142.normed.vcf.gz']
+
+# Reference genome; usually a standard GRC genome
+GENOME : '/net/langmead-bigmem-ib.bluecrab.cluster/storage2/naechyun/mouse_snp/Mus_musculus.GRCm38.dna.primary_assembly.fa'
+
+# chromosomes included
+CHROM : ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', 'X', 'Y']
+
+# 1KG super populations used to build second pass population genomes
+GROUP : ['129P2_OlaHsd', '129S1_SvImJ', '129S5SvEvBrd', 'AKR_J'] 
+
+# Represent a chromosome using "chrx" (set to "chr") or "x" (set to "")
+CHR_PREFIX : ''
+    
+# Mapping quality cutoff to split read into committed and deferred groups
+ALN_MAPQ_THRSD : '10' 
+
+### Second-pass genome parameteres
+# POP_THRSD: 
+#   allele frequency threshold. 0: do not filter by frequency; 0.5: only use major alleles
+# POP_STOCHASTIC: 
+#   1: stochastic update; 0: deterministic
+# POP_BLOCK_SIZE:
+#   size of phase-preserving blocks. Set to 1 when doing independent sampling
+# POP_USE_LD:
+#   1: phase-preserving; 0: independent-sampling
+###
+### Phase-preserving stochastic update (1kbp-blocks)
+#     POP_THRSD : 0
+#     POP_STOCHASTIC : 1
+#     POP_BLOCK_SIZE : 1000
+#     POP_USE_LD : 1
+### Independent-sampling stochastic update
+POP_THRSD : 0
+POP_STOCHASTIC : 1
+POP_BLOCK_SIZE : 1
+POP_USE_LD : 0
+###  Deterministic major ###
+#     POP_THRSD : 0.5
+#     POP_STOCHASTIC : 0
+#     POP_BLOCK_SIZE : 1
+#     POP_USE_LD : 0
+
+# Files specifying 1KG individual-population and population-superpopulation mappings
+FAMILY : '../test/mouse_id_pop.ped'
+SPOP : '../test/mouse_pop_spop.txt'
+
+# Chromosome for GRCh38
+LENGTH_MAP : '../test/GRCm38.length_map'
+CHROM_MAP : '../test/GRCm38.chrom_map'
+
+# Paths of software
+BCFTOOLS : 'bcftools' # there is a bug with `bcftools consensus` in v1.9, so we recommend using the latest dev version
+SAMTOOLS : 'samtools'
+LIFTOVER : '../liftover/liftover'
+PYTHON : 'python'
+DIR_SCRIPTS : '../src'
+
+# Random seed used in the reference flow stochastic reference genome update process and for aligner
+RAND_SEED : 0
