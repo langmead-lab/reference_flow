@@ -36,13 +36,9 @@ Please refer to the [liftover github page](https://github.com/alshai/liftover) t
 
 ## Running reference flow with pre-built indexes
 
-Example:
-
-**TODO: script to download indexes**
-
 ```
+sh src/download_prebuilt_indexes.sh
 cd snakemake
-tar -zxvf ../grch38_1kg_5spop.tar.gz
 snakemake -j 32
 ```
 
@@ -53,7 +49,7 @@ The alignment results are aggrelated as a single SAM file, which uses the GRCh38
 The final SAM file will appear in directory `snakemake/run/experiments/test/thrds0_S1_b1000_ld1/wg-refflow-10-thrds0_S1_b1000_ld1-liftover.sam`.
 
 To use another read set, please change the `READS1` parameter in `snakemake/config.yaml`, 
-or run 
+or run command:
 
 ```
 snakemake -j 32 --config READS1=<file>
