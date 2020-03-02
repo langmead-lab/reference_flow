@@ -52,8 +52,16 @@ By default, a directory called `run` will be created under `snakemake` and all t
 The alignment results are aggrelated as a single SAM file, which uses the GRCh38 coordinate system by default.
 The final SAM file will appear in directory `snakemake/run/experiments/test/thrds0_S1_b1000_ld1/wg-refflow-10-thrds0_S1_b1000_ld1-liftover.sam`.
 
+To use another read set, please change the `READS1` parameter in `snakemake/config.yaml`, 
+or run 
+
+```
+snakemake -j 32 --config READS1=<file>
+```
 
 ## Running complete reference flow pipeline
+
+By set the `USE_PREBUILT` option to `False`, users can run the complete reference flow pipeline.
 
 ### Download Reference genome
 
@@ -73,13 +81,18 @@ Users may choose other reference genomes of interest by changing the `GENOME` pa
 sh src/download_1kg_vcf.sh
 ```
 
-## Reference flow configuration
+Users may switch to the 1KG phase-3 call set by using the corresponding VCFs and changing parameters `DIR_VCF`, `VCF_PREFIX`, and `VCF_SUFFIX` in the configuration file.
+For now we only tested on call sets provided by the 1000 Genomes Project. 
+Call sets provided by other studies may differ slightly in population labelling and VCF format, causing the pipeline not working properly.
+
+## Setting reference flow configuration
 
 Parameters for reference flow are specified in `snakemake/config.yaml` and described [here](snakemake/README.md).
 
-By default we use GRCh38 and the GRCh38 call set from the 1000 Genomes Project. 
-Users may switch to another reference genome, not limited to human's, by changing the `GENOME` parameter in the config file.
+We recommend users try a dry-run by `snakemake -np` to check if the pipeline is ready.
 
-Users may switch to the 1KG phase-3 call set by using the corresponding VCFs in `DIR_VCF`.
-For now we only tested on call sets provided by the 1000 Genomes Project. 
-Call sets provided by other studies may differ slightly in population labelling and VCF format, causing the pipeline not working properly.
+When all set, run
+
+```
+snakemake -j 32
+```
