@@ -6,7 +6,8 @@
 
 - `DIR` : directory where the outputs will be put
 
-- `THREADS` : number of threads used
+- `THREADS` : max number of threads used for each rule.
+This is different from the number specified by `snakemake -j <t>`, which is the number of threads for the entire Snakemake pipeline. I.e., there can be multiple programs running with `THREADS` until the sum reaches `<t>`.
 
 - `GENOME` : reference genome; usually a standard GRC genome
 
