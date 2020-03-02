@@ -2,39 +2,10 @@
 The rules in this file performs coordinate system transformation for aligned reads
 and sort the reads.
 '''
-
-rule liftover_serialize_major:
-    input:
-        vcf_major = os.path.join(DIR, 'major/wg-maj.vcf'),
-        length_map = LENGTH_MAP
-    output:
-        lft = os.path.join(DIR_MAJOR, 'wg-major.lft')
-    params:
-        os.path.join(DIR_MAJOR, 'wg-major')
-    shell:
-        '{LIFTOVER} serialize -v {input.vcf_major} -p {params} -k {input.length_map}'
-
-rule liftover_serialize_pop_genome:
-    input:
-        vcf = os.path.join(DIR_POP_GENOME, POP_DIRNAME + '/' +
-            'wg-superpop_{GROUP}_' + POP_DIRNAME  + '.vcf'),
-        length_map = LENGTH_MAP
-    output:
-        lft = os.path.join(
-            DIR_POP_GENOME, POP_DIRNAME + '/' +
-            'wg-superpop_{GROUP}_' + POP_DIRNAME + '.lft')
-    params:
-        os.path.join(
-            DIR_POP_GENOME, POP_DIRNAME + '/' +
-            'wg-superpop_{GROUP}_' + POP_DIRNAME)
-    run:
-        shell('{LIFTOVER} serialize -v {input.vcf} -p {params} -k {input.length_map}')
-
 rule liftover_lift_major_highq:
     input:
         sam = os.path.join(DIR_FIRST_PASS, 'wg-major-mapqgeq{}.sam'.format(ALN_MAPQ_THRSD)),
-        lft = os.path.join(DIR_MAJOR, 'wg-major.lft'),
-        vcf_major = os.path.join(DIR, 'major/wg-maj.vcf')
+        lft = os.path.join(DIR_MAJOR, 'wg-major.lft')
     output:
         os.path.join(DIR_FIRST_PASS, 'wg-major-mapqgeq{}-liftover.sam'.format(ALN_MAPQ_THRSD))
     params:
@@ -51,12 +22,7 @@ rule liftover_lift_refflow_secondpass_and_merge:
             DIR_POP_GENOME, POP_DIRNAME + '/' +
             'wg-superpop_{GROUP}_' + POP_DIRNAME + '.lft'),
             GROUP = GROUP),
-        vcf_pop = expand(os.path.join(
-            DIR_POP_GENOME, POP_DIRNAME + '/' +
-            'wg-superpop_{GROUP}_' + POP_DIRNAME  + '.vcf'),
-            GROUP = GROUP),
         lft_maj = os.path.join(DIR_MAJOR, 'wg-major.lft'),
-        vcf_major = os.path.join(DIR_MAJOR, 'wg-maj.vcf')
     output:
         lfted_refflow_sam = os.path.join(DIR_SECOND_PASS,
             'wg-refflow-{}-{}-liftover.sam'.format(ALN_MAPQ_THRSD, POP_DIRNAME)),
@@ -101,6 +67,17 @@ rule liftover_lift_refflow_secondpass_and_merge:
                 #: append reads to all-in-one lifted SAM
                 shell('grep -hv "^@" {prefix}.sam >> {output.lfted_refflow_sam};')
 
+rule check_elevate:
+    input:
+        expand(os.path.join(DIR_SECOND_PASS,
+            'wg-refflow-{}-{}-liftover.sam'.format(ALN_MAPQ_THRSD, POP_DIRNAME)),
+        INDIV = INDIV)
+    output:
+        touch(temp(os.path.join(DIR, 'elevate.done')))
+
+'''
+Sort SAM records
+'''
 rule sort_refflow:
     input:
         os.path.join(DIR_SECOND_PASS,
@@ -117,5 +94,5 @@ rule check_sort:
         expand(os.path.join(DIR_SECOND_PASS,
             'wg-refflow-{}-{}-liftover-sorted.bam'.format(ALN_MAPQ_THRSD, POP_DIRNAME)), INDIV = INDIV),
     output:
-        touch(temp(os.path.join(DIR, 'sorting.done')))
+        touch(temp(os.path.join(DIR, 'sort.done')))
 

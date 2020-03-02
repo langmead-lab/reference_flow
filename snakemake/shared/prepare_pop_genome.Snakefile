@@ -162,3 +162,35 @@ rule check_pop_genome:
         )
     output:
         touch(temp(os.path.join(DIR, 'prepare_pop_genome.done')))
+
+
+'''
+Rules for building indexes for liftover.
+'''
+rule liftover_serialize_major:
+    input:
+        vcf_major = os.path.join(DIR, 'major/wg-maj.vcf'),
+        length_map = LENGTH_MAP
+    output:
+        lft = os.path.join(DIR_MAJOR, 'wg-major.lft')
+    params:
+        os.path.join(DIR_MAJOR, 'wg-major')
+    shell:
+        '{LIFTOVER} serialize -v {input.vcf_major} -p {params} -k {input.length_map}'
+
+rule liftover_serialize_pop_genome:
+    input:
+        vcf = os.path.join(DIR_POP_GENOME, POP_DIRNAME + '/' +
+            'wg-superpop_{GROUP}_' + POP_DIRNAME  + '.vcf'),
+        length_map = LENGTH_MAP
+    output:
+        lft = os.path.join(
+            DIR_POP_GENOME, POP_DIRNAME + '/' +
+            'wg-superpop_{GROUP}_' + POP_DIRNAME + '.lft')
+    params:
+        os.path.join(
+            DIR_POP_GENOME, POP_DIRNAME + '/' +
+            'wg-superpop_{GROUP}_' + POP_DIRNAME)
+    run:
+        shell('{LIFTOVER} serialize -v {input.vcf} -p {params} -k {input.length_map}')
+
