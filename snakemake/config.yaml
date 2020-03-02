@@ -2,26 +2,32 @@
 READS1 : '../test/SRR622457_1-1k.fastq'
 
 # Name of the tested sample
-INDIV : 'NA12878'
+INDIV : 'test'
 
 # Directory where the outputs will be put
-DIR: 'run'
+DIR: 'run3/run'
 
 # Number of threads used
 THREADS : 16
 
-# Directory where the 1KG VCFs are put
-DIR_VCF : '../resources/1kg_vcf'
+USE_PREBUILT : True
+SORT_SAM : False
 
 # Reference genome; usually a standard GRC genome
 GENOME : '../resources/GCA_000001405.15_GRCh38_no_alt_analysis_set.fna'
 
 # chromosomes included
 CHROM : ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', 'X', 'Y']
+CHR_PREFIX : 'chr'
+
+# Directory where the 1KG VCFs are put
+DIR_VCF : '../resources/1kg_vcf'
+VCF_PREFIX : 'ALL.chr'
+VCF_SUFFIX : '.shapeit2_integrated_snvindels_v2a_27022019.GRCh38.phased.vcf.gz'
 
 # 1KG super populations used to build second pass population genomes
 GROUP : ['EUR', 'AMR', 'EAS', 'SAS', 'AFR'] 
-    
+
 # mapping quality cutoff to split read into committed and deferred groups
 ALN_MAPQ_THRSD : '10' 
 
@@ -36,10 +42,10 @@ ALN_MAPQ_THRSD : '10'
 #   1: phase-preserving; 0: independent-sampling
 ###
 ### Phase-preserving stochastic update (1kbp-blocks)
-    POP_THRSD : 0
-    POP_STOCHASTIC : 1
-    POP_BLOCK_SIZE : 1000
-    POP_USE_LD : 1
+POP_THRSD : 0
+POP_STOCHASTIC : 1
+POP_BLOCK_SIZE : 1000
+POP_USE_LD : 1
 ### Independent-sampling stochastic update
 #     POP_THRSD : 0
 #     POP_STOCHASTIC : 1

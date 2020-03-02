@@ -2,6 +2,7 @@ import os
 import pandas as pd
 
 configfile: "config.yaml"
+# configfile: "config_mouse.yaml"
 
 ''' Load from config '''
 CHROM = config['CHROM']
@@ -14,9 +15,15 @@ POP_STOCHASTIC = config['POP_STOCHASTIC']
 POP_BLOCK_SIZE = config['POP_BLOCK_SIZE']
 POP_USE_LD = config['POP_USE_LD']
 
+USE_PREBUILT = config['USE_PREBUILT']
+SORT_SAM = config['SORT_SAM']
+
 DIR = config['DIR']
 GENOME = config['GENOME']
 DIR_VCF = config['DIR_VCF']
+VCF_PREFIX = config['VCF_PREFIX']
+VCF_SUFFIX = config['VCF_SUFFIX']
+CHR_PREFIX = config['CHR_PREFIX']
 LENGTH_MAP = config['LENGTH_MAP']
 CHROM_MAP = config['CHROM_MAP']
 
@@ -69,42 +76,53 @@ DIR_RESULTS_BIAS = os.path.join(DIR, 'results/bias')
 # Functions
 include: '../snakemake/shared/functions.Snakefile'
 
-# Prepare pop genome and indexes
-#      check: 'prepare_pop_genome.done'
-include: 'shared/prepare_pop_genome.Snakefile'
-
-# Prepare grc and major genome and indexes
-#      check: 'prepare_standard_genome.done'
-include: 'shared/prepare_standard_genome.Snakefile'
+if not USE_PREBUILT:
+    # Prepare pop genome and indexes
+    #      check: 'prepare_pop_genome.done'
+    include: 'shared/prepare_pop_genome.Snakefile'
+    
+    # Prepare grc and major genome and indexes
+    #      check: 'prepare_standard_genome.done'
+    include: 'shared/prepare_standard_genome.Snakefile'
 
 # Align reads to grch major, reference flow, personalized genomes
 #      check: 'alignment_refflow.done'
 include: 'shared/alignment.Snakefile'
 
 # Elevate and sort reads
-#      check: 'sorting.done'
+#      check: 'elevate.done', 'sort.done'
 include: 'shared/elevate_and_sort.Snakefile'
 
+TODO_LIST = ['alignment_refflow.done', 'elevate.done']
+if not USE_PREBUILT:
+    TODO_LIST.append('prepare_pop_genome.done')
+    TODO_LIST.append('prepare_standard_genome.done')
+if SORT_SAM:
+    TODO_LIST.append('sorting.done')
 
 ''' Snakemake rules '''
 rule all:
     input:
-        # Building genomes
-        pop_genome = os.path.join(DIR, 'prepare_pop_genome.done'),
-        standard_genome = os.path.join(DIR, 'prepare_standard_genome.done'),
-        # Align reads with reference flow
-        align_refflow = os.path.join(DIR, 'alignment_refflow.done'),
-        # Sort SAMs (liftover is included here as well)
-        sorting = os.path.join(DIR, 'sorting.done'),
+        expand(os.path.join(DIR, '{task}'), task = TODO_LIST)
+        #   # Building genomes
+        #   pop_genome = os.path.join(DIR, 'prepare_pop_genome.done'),
+        #   standard_genome = os.path.join(DIR, 'prepare_standard_genome.done'),
+        #   # Align reads with reference flow
+        #   align_refflow = os.path.join(DIR, 'alignment_refflow.done'),
+        #   # Elevate alignments to standard reference genome coordinates
+        #   elevate = os.path.join(DIR, 'elevate.done'),
+        #   # Sort SAMs
+        #   sorting = os.path.join(DIR, 'sort.done'),
 
 rule filter_vcf:
     input:
-        vcf = os.path.join(DIR_VCF, 'ALL.chr{CHROM}.shapeit2_integrated_snvindels_v2a_27022019.GRCh38.phased.vcf.gz'),
+        vcf = os.path.join(DIR_VCF, VCF_PREFIX + '{CHROM}' + VCF_SUFFIX),
         chrom_map = CHROM_MAP
     output:
         vcf = PREFIX_VCF_F + '.vcf'
     shell:
-        '{BCFTOOLS} view -c 1 -f PASS -V mnps,other {input.vcf} | {BCFTOOLS} annotate --rename-chrs {input.chrom_map} -o {output.vcf}'
+        '{BCFTOOLS} view -r {wildcards.CHROM} -c 1 -f PASS -V mnps,other {input.vcf} | {BCFTOOLS} annotate --rename-chrs {input.chrom_map} -o {output.vcf}'
+        # '{BCFTOOLS} view -c 1 -f PASS -V mnps,other {input.vcf} | {BCFTOOLS} annotate --rename-chrs {input.chrom_map} -o {output.vcf}'
 
 rule aggregate_vcf:
     input:
@@ -120,4 +138,4 @@ rule prepare_chrom_genome:
     output:
         os.path.join(DIR, 'chr{CHROM}.fa')
     shell:
-        '{SAMTOOLS} faidx {input.genome} chr{wildcards.CHROM} > {output};'
+        '{SAMTOOLS} faidx {input.genome} {CHR_PREFIX}{wildcards.CHROM} > {output};'
