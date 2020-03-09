@@ -3,7 +3,7 @@
 Reference flow is a computational genomics pipeline to align short sequencing 
 reads with a number of reference genomes built with population genomic information included.
 
-The preprint will be posted on bioRxiv.
+The preprint ["Reducing reference bias using multiple population reference genomes"](https://doi.org/10.1101/2020.03.03.975219) is available on bioRxiv.
 
 The experiments we've done are provided in the [Reference Flow Experiments repository](https://github.com/langmead-lab/reference_flow-experiments).
 
