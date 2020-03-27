@@ -10,8 +10,9 @@ rule liftover_lift_major_highq:
         os.path.join(DIR_FIRST_PASS, 'wg-major-mapqgeq{}-liftover.sam'.format(ALN_MAPQ_THRSD))
     params:
         os.path.join(DIR_FIRST_PASS, 'wg-major-mapqgeq{}-liftover'.format(ALN_MAPQ_THRSD))
+    threads: THREADS
     run:
-        shell('{LIFTOVER} lift -a {input.sam} -l {input.lft} -p {params}')
+        shell('{LIFTOVER} lift -a {input.sam} -l {input.lft} -p {params} -t {threads}')
 
 #: Refflow -- second pass
 rule liftover_lift_refflow_secondpass_and_merge:
@@ -30,6 +31,7 @@ rule liftover_lift_refflow_secondpass_and_merge:
         lfted_group_second_sam = [
             os.path.join(DIR_SECOND_PASS, '2ndpass-') + 
             g + '-liftover.sam' for g in GROUP]
+    threads: THREADS
     run:
         list_sam = []
         list_group = []
@@ -54,7 +56,7 @@ rule liftover_lift_refflow_secondpass_and_merge:
                 '/2ndpass-{}-liftover'.format(list_group[i]))
             if list_group[i] == 'maj':
                 sys.stderr.write('sam={}, lft = {}\n'.format(sam, input.lft_maj))
-                shell('{LIFTOVER} lift -a {sam} -l {input.lft_maj} -p {prefix};')
+                shell('{LIFTOVER} lift -a {sam} -l {input.lft_maj} -p {prefix} -t {threads};')
                 #: append reads to all-in-one lifted SAM
                 shell('grep -hv "^@" {prefix}.sam >> {output.lfted_refflow_sam};')
             elif list_group[i] in GROUP:
@@ -63,7 +65,7 @@ rule liftover_lift_refflow_secondpass_and_merge:
                     if lft.count(list_group[i]) > 0:
                         break
                 sys.stderr.write('sam={}, lft = {}\n'.format(sam, lft))
-                shell('{LIFTOVER} lift -a {sam} -l {lft} -p {prefix};')
+                shell('{LIFTOVER} lift -a {sam} -l {lft} -p {prefix} -t {threads};')
                 #: append reads to all-in-one lifted SAM
                 shell('grep -hv "^@" {prefix}.sam >> {output.lfted_refflow_sam};')
 
