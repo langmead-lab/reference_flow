@@ -1,13 +1,15 @@
 import os
 import pandas as pd
 
-configfile: "config.yaml"
+configfile: "config_local.yaml"
+# configfile: "config.yaml"
 # configfile: "config_mouse.yaml"
 
 ''' Load from config '''
 CHROM = config['CHROM']
 INDIV = config['INDIV']
 READS1 = config['READS1']
+READS2 = config['READS2']
 GROUP = config['GROUP']
 ALN_MAPQ_THRSD = config['ALN_MAPQ_THRSD']
 POP_THRSD = config['POP_THRSD']
