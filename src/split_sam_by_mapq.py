@@ -60,25 +60,28 @@ def process_single_end_data(f_in, fhigh_out, flow_out, fastq_prefix, mapq_thresh
     '''
     Process single-end data, don't need to worry about the strategies for paired-end reads
     '''
-    f_fastq = fastq_prefix + '.fq'
+    if fastq_prefix:
+        f_fastq = fastq_prefix + '.fq'
     for line in f_in:
         if line[0] == '@':
             fhigh_out.write(line)
             flow_out.write(line)
         else:
             mapq = line.split()[4]
-            if mapq >= mapq_threshold:
+            if int(mapq) >= mapq_threshold:
                 fhigh_out.write(line)
             else:
                 flow_out.write(line)
-                write_line_to_fastq(line, f_fastq)
+                if fastq_prefix:
+                    write_line_to_fastq(line, f_fastq)
 
 def process_paired_end_data(f_in, fhigh_out, flow_out, fastq_prefix, mapq_threshold, split_strategy):
     '''
     Process paired-end data
     '''
-    flow_fq1_out = open(fastq_prefix + '_1.fq', 'w')
-    flow_fq2_out = open(fastq_prefix + '_2.fq', 'w')
+    if fastq_prefix:
+        flow_fq1_out = open(fastq_prefix + '_1.fq', 'w')
+        flow_fq2_out = open(fastq_prefix + '_2.fq', 'w')
 
     name = ''
     prev_line = ''
@@ -96,14 +99,15 @@ def process_paired_end_data(f_in, fhigh_out, flow_out, fastq_prefix, mapq_thresh
                 else:
                     mapq = min(prev_line.split()[4], line.split()[4])
 
-                if mapq >= mapq_threshold:
+                if int(mapq) >= mapq_threshold:
                     fhigh_out.write(prev_line)
                     fhigh_out.write(line)
                 else:
                     flow_out.write(prev_line)
                     flow_out.write(line)
-                    write_line_to_fastq(line, flow_fq1_out)
-                    write_line_to_fastq(line, flow_fq2_out)
+                    if fastq_prefix:
+                        write_line_to_fastq(line, flow_fq1_out)
+                        write_line_to_fastq(line, flow_fq2_out)
                 name = ''
                 prev_line = ''
                 prev_mapq = 0
