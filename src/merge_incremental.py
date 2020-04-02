@@ -145,10 +145,10 @@ def get_best_pair(list_line):
     '''
     list_info = []
     list_name = []
-    for i, line in enumerate(list_line[: len(list_line)/2]):
+    for i, line in enumerate(list_line[: int(len(list_line)/2)]):
         # info: QNAME, AS:i, MAPQ, flag
         info = get_info_from_sam_line(line, flag = True)
-        info_mate = get_info_from_sam_line(list_line[i + len(list_line)/2], flag = True)
+        info_mate = get_info_from_sam_line(list_line[i + int(len(list_line)/2)], flag = True)
 
         # check if QNAMEs of a pair match and flags are reasonable
         try:
@@ -185,7 +185,7 @@ def get_best_pair(list_line):
         list_info.append(pair_info)
 
     idx = compare_score_and_mapq(list_info)[0]
-    return idx, list_line[idx], list_line[idx + len(list_line)/2]
+    return idx, list_line[idx], list_line[idx + int(len(list_line)/2)]
 
 def merge_core(list_f_sam, list_f_out, is_paired_end):
     '''
