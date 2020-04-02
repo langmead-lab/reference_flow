@@ -26,8 +26,8 @@ def parse_args():
                 equal to `-t` are called high quality [10]'
     )
     parser.add_argument(
-        '--single-end', action='store_true',
-        help="Set if reads are single-end [Off]"
+        '--paired-end', action='store_true',
+        help="Set if reads are paired-end [Off]"
     )
     parser.add_argument(
         '--split-strategy',
@@ -126,8 +126,8 @@ def process_paired_end_data(f_in, fhigh_out, flow_out, fastq_prefix, mapq_thresh
 
 def split_sam_by_mapq(args):
     mapq_threshold = args.mapq_threshold
-    is_single_end = args.single_end
-    if is_single_end:
+    is_paired_end = args.paired_end
+    if not is_paired_end:
         split_strategy = ''
     else:
         split_strategy = args.split_strategy
@@ -138,7 +138,7 @@ def split_sam_by_mapq(args):
     flow_out = open(args.sam_lowq, 'w')
     fastq_prefix = args.fastq_lowq_prefix
     
-    if is_single_end:
+    if not is_paired_end:
         process_single_end_data(f_in, fhigh_out, flow_out, fastq_prefix, mapq_threshold)
     else:
         process_paired_end_data(f_in, fhigh_out, flow_out, fastq_prefix, mapq_threshold, split_strategy)
