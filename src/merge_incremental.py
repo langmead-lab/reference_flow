@@ -148,7 +148,7 @@ def get_best_pair(list_line):
     for i, line in enumerate(list_line[: len(list_line)/2]):
         # info: QNAME, AS:i, MAPQ, flag
         info = get_info_from_sam_line(line, flag = True)
-        info_mate = get_best_line(list_line[i + len(list_line)/2], flag = True)
+        info_mate = get_info_from_sam_line(list_line[i + len(list_line)/2], flag = True)
 
         # check if QNAMEs of a pair match and flags are reasonable
         try:
@@ -198,6 +198,7 @@ def merge_core(list_f_sam, list_f_out, is_paired_end):
             `merge_core()` write results directly to the files
         is_paired_end: True if data is paired-end; False if single-end
     '''
+    len_list = len(list_f_sam)
     list_read = []
     for line in list_f_sam[0]:
         # read all header lines for the first input SAM file
@@ -216,24 +217,26 @@ def merge_core(list_f_sam, list_f_out, is_paired_end):
         
         try:
             # each read should be included by all SAM files
-            if not paired_end:
+            if not is_paired_end:
                 assert len(list_read) == len_list
             else:
-                assert len(list_read) == len_list or len(list_read) == 2 * len_list
+                assert (len(list_read) == len_list) or (len(list_read) == 2 * len_list)
         except:
             print ('Error: number of alignments does not match')
+            print ('len_read = {}, len_list = {}'.format(len(list_read), len_list))
             print (list_read)
             exit (1)
 
-        if not paired_end:
+        if not is_paired_end:
             best_idx, best_line = get_best_line(list_read)
             list_f_out[best_idx].write(best_line)
             list_read = []
         else:
             if len(list_read) == 2 * len_list:
                 best_idx, best_line1, best_line2 = get_best_pair(list_read)
-                list_f_out[best_idx].write(best_line)
+                list_f_out[best_idx].write(best_line1)
                 list_f_out[best_idx].write(best_line2)
+                list_read = []
     return
 
 def merge_incremental(args):
@@ -244,7 +247,6 @@ def merge_incremental(args):
     fn_ids = args.id_list # 'to_merge.id'
     fn_log = args.log # 'merged.path'
     prefix = args.prefix
-    is_paired_end = args.paired_end
     
     #: set random seed
     seed = args.rand_seed
@@ -281,6 +283,8 @@ def merge_incremental(args):
             f_log.write(fn_out + '\n')
         sys.stderr.write(fn_out + '\n')
         list_f_out.append(open(fn_out, 'w'))
+
+    merge_core(list_f_sam, list_f_out, args.paired_end)
 
     return
 

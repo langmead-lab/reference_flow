@@ -21,7 +21,7 @@ rule refflow_split_aln_by_mapq:
     This is under a paired-end configuration
     '''
     input:
-        sam = os.path.join(dir_first_pass, 'wg-major.sam')
+        sam = os.path.join(DIR_FIRST_PASS, 'wg-major.sam')
     output:
         highq = os.path.join(DIR_FIRST_PASS,
             'wg-major-mapqgeq' + ALN_MAPQ_THRSD + '.sam'),
@@ -39,7 +39,7 @@ rule refflow_split_aln_by_mapq:
     shell:
         '{PYTHON} {DIR_SCRIPTS}/split_sam_by_mapq.py -s {input.sam} \
         -oh {output.highq} -ol {output.lowq} -oq {params.fastq} \
-        -t {ALN_MAPQ_THRSD} --split-strategy {params.split_strategy}'
+        -t {ALN_MAPQ_THRSD} --paired-end --split-strategy {params.split_strategy}'
 
 rule refflow_align_secondpass_paired_end:
     input:
@@ -66,7 +66,7 @@ rule refflow_merge_secondpass:
         sam = expand(
             PREFIX_SECOND_PASS + '.sam',
             INDIV = INDIV, GROUP = GROUP),
-        maj = os.path.join(DIR_FIRST_PASS, 'wg-major-mapqlt{}-paired.sam'.format(ALN_MAPQ_THRSD))
+        maj = os.path.join(DIR_FIRST_PASS, 'wg-major-mapqlt{}.sam'.format(ALN_MAPQ_THRSD))
     output:
         path = os.path.join(DIR_SECOND_PASS, 'wg-major-{}-{}.paths'.format(ALN_MAPQ_THRSD, POP_DIRNAME)),
         label = os.path.join(DIR_SECOND_PASS, 'wg-major-{}-{}.ids'.format(ALN_MAPQ_THRSD, POP_DIRNAME)),
