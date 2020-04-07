@@ -53,6 +53,12 @@ def get_info_from_sam_line(line, flag = False):
     name = line[0]
     flag = int(line[1])
     mapq = int(line[4])
+    if mapq == 255:
+        # https://samtools.github.io/hts-specs/SAMv1.pdf
+        # No alignments should be assigned mapping quality 255.
+        mapq = 0
+        print ('Warning: it is not recommended to have a MAPQ of 255. Replaced it with 0')
+
     score = 1 #: represents unmapped
     for i in line:
         if i.startswith('AS:i'):
@@ -180,7 +186,16 @@ def get_best_pair(list_line):
         
         # compare sum of score and MAPQ
         pair_info = []
-        pair_info.append(info[1] + info_mate[1])
+        # `score == 1` means unmapped and we ignore unmapped segments
+        if info[1] == 1 and info_mate[1] == 1:
+            pair_info.append(1)
+        elif info[1] == 1:
+            pair_info.append(info_mate[1])
+        elif info_mate == 1:
+            pair_info.append(info[1])
+        else:
+            pair_info.append(info[1] + info_mate[1])
+        # MAPQ
         pair_info.append(info[2] + info_mate[2])
         list_info.append(pair_info)
 
