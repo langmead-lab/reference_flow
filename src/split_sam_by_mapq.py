@@ -46,15 +46,30 @@ def parse_args():
     args = parser.parse_args()
     return args
 
+def get_reverse_complement(seq):
+    '''
+    Perform reverse and complement transformation
+    '''
+    complement = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A', 'a': 't', 'c': 'g', 'g': 'c', 't': 'a'}
+    return "".join(complement.get(base, base) for base in reversed(seq))
+
 def write_line_to_fastq(line, f_fastq):
     '''
     Write a SAM line to a FASTQ file
     '''
     fields = line.split()
-    f_fastq.write('@' + fields[0] + '\n')
-    f_fastq.write(fields[9] + '\n')
-    f_fastq.write('+\n')
-    f_fastq.write(fields[10] + '\n')
+    is_reverse = int(fields[1]) & 16
+    if is_reverse:
+        # reverse and complement SEQ, reverse QUAL
+        f_fastq.write('@' + fields[0] + '\n')
+        f_fastq.write(get_reverse_complement(fields[9]) + '\n')
+        f_fastq.write('+\n')
+        f_fastq.write(fields[10][::-1] + '\n')
+    else:
+        f_fastq.write('@' + fields[0] + '\n')
+        f_fastq.write(fields[9] + '\n')
+        f_fastq.write('+\n')
+        f_fastq.write(fields[10] + '\n')
 
 def process_single_end_data(f_in, fhigh_out, flow_out, fastq_prefix, mapq_threshold):
     '''
@@ -106,8 +121,21 @@ def process_paired_end_data(f_in, fhigh_out, flow_out, fastq_prefix, mapq_thresh
                     flow_out.write(prev_line)
                     flow_out.write(line)
                     if fastq_prefix:
-                        write_line_to_fastq(line, flow_fq1_out)
-                        write_line_to_fastq(line, flow_fq2_out)
+                        prev_flag = int(prev_line.split()[1])
+                        flag = int(line.split()[1])
+                        # first/second segment: prev/current line
+                        if (prev_flag & 64) and (flag & 128):
+                            write_line_to_fastq(prev_line, flow_fq1_out)
+                            write_line_to_fastq(line, flow_fq2_out)
+                        # first/second segment: current/prev line
+                        elif (prev_flag & 128) and (flag & 64):
+                            write_line_to_fastq(prev_line, flow_fq2_out)
+                            write_line_to_fastq(line, flow_fq1_out)
+                        else:
+                            print ('Error: read is not paired-end')
+                            print (prev_line)
+                            print (line)
+                            exit (1)
                 name = ''
                 prev_line = ''
                 prev_mapq = 0
