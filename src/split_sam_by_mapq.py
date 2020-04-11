@@ -1,4 +1,47 @@
 import argparse
+import threading
+
+class ReadWriteLock:
+    ''' From https://www.oreilly.com/library/view/python-cookbook/0596001673/ch06s04.html '''
+    """ A lock object that allows many simultaneous "read locks", but
+    only one "write lock." """
+
+    def __init__(self):
+        self._read_ready = threading.Condition(threading.Lock())
+        self._readers = 0
+
+    def acquire_read(self):
+        """ Acquire a read lock. Blocks only if a thread has
+        acquired the write lock. """
+        self._read_ready.acquire()
+        try:
+            self._readers += 1
+            #print ('acquire_read()', self._readers)
+        finally:
+            self._read_ready.release()
+            #print ('acquire_read(): _read_ready.release()')
+
+    def release_read(self):
+        """ Release a read lock. """
+        self._read_ready.acquire()
+        try:
+            self._readers -= 1
+            if not self._readers:
+                self._read_ready.notifyAll()
+        finally:
+            self._read_ready.release()
+
+    def acquire_write(self):
+        """ Acquire a write lock. Blocks until there are no
+        acquired read or write locks. """
+        self._read_ready.acquire()
+        while self._readers > 0:
+            self._read_ready.wait()
+
+    def release_write(self):
+        """ Release a write lock. """
+        self._read_ready.release()
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -71,24 +114,86 @@ def write_line_to_fastq(line, f_fastq):
         f_fastq.write('+\n')
         f_fastq.write(fields[10] + '\n')
 
-def process_single_end_data(f_in, fhigh_out, flow_out, fastq_prefix, mapq_threshold):
-    '''
-    Process single-end data, don't need to worry about the strategies for paired-end reads
-    '''
-    if fastq_prefix:
-        f_fastq = fastq_prefix + '.fq'
-    for line in f_in:
-        if line[0] == '@':
-            fhigh_out.write(line)
-            flow_out.write(line)
-        else:
-            mapq = line.split()[4]
-            if int(mapq) >= mapq_threshold:
-                fhigh_out.write(line)
+def process_paired_end_data_line(
+    line,
+    line_nxt,
+    fhigh_out,
+    flow_out,
+    flow_fq1_out,
+    flow_fq2_out,
+    mapq_threshold,
+    split_strategy
+):
+    fields = line.split()
+    fields_nxt = line_nxt.split()
+    try:
+        assert(fields[0] == fields_nxt[0])
+    except:
+        print ('Warning: singleton read')
+        print (line.rstrip())
+        print (line_nxt.rstrip())
+        exit(1)
+
+    if split_strategy == 'optimistic':
+        mapq = max(int(fields[4]), int(fields_nxt[4]))
+    else:
+        mapq = min(int(fields[4]), int(fields_nxt[4]))
+
+    if mapq >= mapq_threshold:
+        fhigh_out.write(line)
+        fhigh_out.write(line_nxt)
+    else:
+        flow_out.write(line)
+        flow_out.write(line_nxt)
+        if flow_fq1_out:
+            flag = int(fields[1])
+            flag_nxt = int(fields_nxt[1])
+            # first/second segment: current/next line
+            if (flag & 64) and (flag_nxt & 128):
+                write_line_to_fastq(line, flow_fq1_out)
+                write_line_to_fastq(line_nxt, flow_fq2_out)
+            # first/second segment: next/current line
+            elif (flag & 128) and (flag_nxt & 64):
+                write_line_to_fastq(line, flow_fq2_out)
+                write_line_to_fastq(line_nxt, flow_fq1_out)
             else:
+                print ('Error: read is not paired-end')
+                print (line)
+                print (line_nxt)
+                exit (1)
+
+def process_paired_end_data_parallel_core(
+    f_in, fhigh_out, flow_out, flow_fq1_out, flow_fq2_out, mapq_threshold, split_strategy, rw_lock
+):  
+    chunk_size = 10000
+    lines = []
+    while 1:
+        # spins until the lock is released
+        rw_lock.acquire_write()
+
+        # reads header. Headers are not counted in the chunk.
+        while 1:
+            line = f_in.readline()
+            if line and (line[0] == '@'):
+                fhigh_out.write(line)
                 flow_out.write(line)
-                if fastq_prefix:
-                    write_line_to_fastq(line, f_fastq)
+            else:
+                # non-header line or end-of-file
+                break
+        if line:
+            lines.append(line)
+        for i in range(chunk_size - 1):
+            line_nxt = f_in.readline()
+            if line_nxt:
+                lines.append(line_nxt)
+        rw_lock.release_write()
+
+        if not lines:
+            return
+
+        for i in range(0, len(lines), 2):
+            process_paired_end_data_line(lines[i], lines[i+1], fhigh_out, flow_out, flow_fq1_out, flow_fq2_out, mapq_threshold, split_strategy)
+        lines = []
 
 def process_paired_end_data(f_in, fhigh_out, flow_out, fastq_prefix, mapq_threshold, split_strategy):
     '''
@@ -98,59 +203,27 @@ def process_paired_end_data(f_in, fhigh_out, flow_out, fastq_prefix, mapq_thresh
         flow_fq1_out = open(fastq_prefix + '_1.fq', 'w')
         flow_fq2_out = open(fastq_prefix + '_2.fq', 'w')
 
-    name = ''
-    prev_line = ''
-    prev_mapq = 0
+    # rw_lock = ReadWriteLock()
+    # threads = []
+    # for i in range(4):
+    #     t = threading.Thread(
+    #         target = process_paired_end_data_parallel_core,
+    #         args=(f_in, fhigh_out, flow_out, flow_fq1_out, flow_fq2_out, mapq_threshold, split_strategy, rw_lock)
+    #     )
+    #     t.start()
+    #     threads.append(t)
+
+    # for t in threads:
+    #     print (t)
+    #     t.join()
+
     for line in f_in:
         if line[0] == '@':
             fhigh_out.write(line)
             flow_out.write(line)
         else:
-            new_name = line.split()[0]
-            if new_name == name:
-                # see a pair
-                if split_strategy == 'optimistic':
-                    mapq = max(prev_line.split()[4], line.split()[4])
-                else:
-                    mapq = min(prev_line.split()[4], line.split()[4])
-
-                if int(mapq) >= mapq_threshold:
-                    fhigh_out.write(prev_line)
-                    fhigh_out.write(line)
-                else:
-                    flow_out.write(prev_line)
-                    flow_out.write(line)
-                    if fastq_prefix:
-                        prev_flag = int(prev_line.split()[1])
-                        flag = int(line.split()[1])
-                        # first/second segment: prev/current line
-                        if (prev_flag & 64) and (flag & 128):
-                            write_line_to_fastq(prev_line, flow_fq1_out)
-                            write_line_to_fastq(line, flow_fq2_out)
-                        # first/second segment: current/prev line
-                        elif (prev_flag & 128) and (flag & 64):
-                            write_line_to_fastq(prev_line, flow_fq2_out)
-                            write_line_to_fastq(line, flow_fq1_out)
-                        else:
-                            print ('Error: read is not paired-end')
-                            print (prev_line)
-                            print (line)
-                            exit (1)
-                name = ''
-                prev_line = ''
-                prev_mapq = 0
-            elif (new_name != name) and (name == ''):
-                name = new_name
-                prev_line = line
-                prev_mapq = line[4]
-            else:
-                # singleton, should not happen
-                print ('Error: read {} is a singleton. Please check the data'.format(name))
-                exit(1)
-    if prev_line:
-        print ('Error: read {} is a singleton. Please check the data'.format(name))
-        exit(1)
-
+            line_nxt = f_in.readline()
+            process_paired_end_data_line(line, line_nxt, fhigh_out, flow_out, flow_fq1_out, flow_fq2_out, mapq_threshold, split_strategy)
 
 def split_sam_by_mapq(args):
     mapq_threshold = args.mapq_threshold
