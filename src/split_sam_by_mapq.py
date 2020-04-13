@@ -69,14 +69,14 @@ def parse_args():
                 equal to `-t` are called high quality [10]'
     )
     parser.add_argument(
-        '--paired-end', action='store_true',
+        '-pe', '--paired-end', action='store_true',
         help="Set if reads are paired-end [Off]"
     )
     parser.add_argument(
-        '--split-strategy',
+        '-ss', '--split-strategy',
         help='Split strategy (only needed when using paired-end reads): \
-                "optimistic" takes the pair if any of it is high quality, \
-                "pessimistic" takes the pair when both are high quality'
+                "optimistic/opt" takes the pair if any of it is high quality, \
+                "pessimistic/pes" takes the pair when both are high quality'
     )
     # parser.add_argument(
     #     '-rs', '--rand-seed',
@@ -134,12 +134,14 @@ def process_paired_end_data_line(
         print (line_nxt.rstrip())
         exit(1)
 
-    if split_strategy == 'optimistic':
+    if split_strategy in ['opt', 'optimistic']:
         mapq = max(int(fields[4]), int(fields_nxt[4]))
     else:
         mapq = min(int(fields[4]), int(fields_nxt[4]))
 
-    if mapq >= mapq_threshold:
+    concordant = (fields[2] == fields_nxt[2])
+
+    if mapq >= mapq_threshold and concordant:
         fhigh_out.write(line)
         fhigh_out.write(line_nxt)
     else:
@@ -232,7 +234,7 @@ def split_sam_by_mapq(args):
         split_strategy = ''
     else:
         split_strategy = args.split_strategy
-        assert split_strategy in ['optimistic', 'pessimistic']
+        assert split_strategy in ['optimistic', 'opt', 'pessimistic', 'pes']
 
     f_in = open(args.sam, 'r')
     fhigh_out = open(args.sam_highq, 'w')
