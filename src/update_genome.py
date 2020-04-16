@@ -6,15 +6,24 @@ write to a new file.
 import sys
 import argparse
 import random
+import copy
+from collections import OrderedDict
 
 def get_mutation_type(orig, alts):
     '''
-    Compare length of REF allele and ALT allele(s) and report variant type:
-        SNP: equal in length, length == 1
-        MNP: equal in length, length > 1
-        INDEL: not equal in length
-        MULT: multiple ALT alleles
-        (assertion fails if more than one REF allele)
+    Compare length of REF allele and ALT allele(s) and report variant type.
+
+    Args:
+        orig: ORIG genotype (string)
+        alts: ALT genotype (string), if multi-allelic, split by ','
+    Return:
+        a string that can be the following:
+            SNP: equal in length, length == 1
+            MNP: equal in length, length > 1
+            INDEL: not equal in length
+            MULT: multiple ALT alleles
+    Assertions:
+        there is only one REF allele
     '''
     assert orig.count(',') == 0
     if alts.count(',') == 0:
@@ -26,16 +35,6 @@ def get_mutation_type(orig, alts):
             return 'INDEL'
     return 'MULT'
         
-# def get_mutation_type(info):
-#     '''
-#     Returns the value of the VT attribute from the info field
-#     '''
-
-#     attrs = info.split(';')
-#     for a in attrs:
-#         if a[:3] == 'VT=':
-#             return a[3:]
-
 def get_allele_freq(info, num_haps, data_source, gnomad_ac_field):
     '''
     Returns allele frequency for a variant.
@@ -64,6 +63,67 @@ def get_allele_freq(info, num_haps, data_source, gnomad_ac_field):
                 return float(a.split('=')[1]) / num_haps
     return -1
 
+
+def process_vcf_header(line, indiv, f_vcf, data_source):
+    '''
+    Process the header line of a VCF file
+
+    Args:
+        line (string): header line from the VCF file
+        indiv (string): targeted sample (can be None)
+        f_vcf (file): file that we are writing to
+        data_source (string): project that generates the call set
+
+    Returns:
+        col (int/None): column index for `indiv`, None if `indiv` is not provided
+        num_haps (int/None): number of samples in the call set, None if the call set not including phasing
+        labels (list): split fields of `line`
+    '''
+    labels = line.rstrip().split('\t')
+    # if `indiv` is set, select the corresponding column
+    col = None
+    num_haps = None
+    if indiv != None:
+        for i in range(9, len(labels)):
+            if labels[i] == indiv:
+                col = i
+        if not col:
+            print('Error! Couldn\'t find individual %s in VCF' % indiv)
+            exit(1)
+        f_vcf.write('\t'.join(labels[:9]) + f'\t{labels[col]}\n')
+    else:
+        if data_source == '1kg':
+            # skip sample genotype columns
+            f_vcf.write('\t'.join(labels[:9]) + '\n')
+        else:
+            f_vcf.write(line)
+
+    if data_source == '1kg':
+        # calculate number of haplotypes (2 x number of samples)
+        num_haps = 2 * (len(labels) - 9)
+
+    return col, num_haps, labels
+
+
+def write_to_fasta(dict_genome, out_prefix, suffix, line_width = 60):
+    '''
+    Write genome to a FASTA file
+    '''
+    f_fasta = open(f'{out_prefix}{suffix}.fa', 'w')
+
+    # uncomment to show output in lexical order
+    # for key in sorted(dict_genome.keys()):
+
+    # show output following input order
+    for key in dict_genome.keys():
+        # write full contig name
+        f_fasta.write(f'>{dict_genome[key][0]}\n')
+        # write sequence, 60 chars per line
+        for i in range(0, len(dict_genome[key][1]), line_width):
+            f_fasta.write(''.join(dict_genome[key][1][i: i + line_width]) + '\n')
+    f_fasta.close()
+
+
 def update_allele(
     orig,
     alts,
@@ -78,22 +138,26 @@ def update_allele(
     offset_other,
     chrom
 ):
+    '''
+    Update an allele
+    '''
+
     if len(orig) != len(alts[allele-1]):
-        type = 'INDEL'
+        v_type = 'INDEL'
     else:
-        type = 'SNP'
+        v_type = 'SNP'
     flag_skip = False
     if indels:
-        #: ignores conflicts or overlapped variants
-        #: but accepts overlapped INS
-        if loc == head-1 and (len(orig) < len(alts[allele-1])):
-            print ('Warning: overlapped INS at {0} for hap{1}'.format(loc, hap_str))
+        # ignores conflicts or overlapped variants
+        # but accepts overlapped INS
+        if loc == head - 1 and (len(orig) < len(alts[allele - 1])):
+            print ('Warning: overlapped INS at {0}, {1} for hap{2}'.format(loc, chrom, hap_str))
             new_offset = add_alt(hap, loc-1, orig, alts[allele-1], offset, True)
         elif loc >= head:
             new_offset = add_alt(hap, loc-1, orig, alts[allele-1], offset, False)
         else:
             flag_skip = True
-            print ('Warning: conflict at {0} for hap{1}'.format(loc, hap_str))
+            print ('Warning: conflict at {0}, {1} for hap{2}'.format(loc, chrom, hap_str))
     else:
         new_offset = 0
         hap[loc+offset-1] = alts[allele-1]
@@ -101,19 +165,103 @@ def update_allele(
     if not flag_skip:
         f_var.write(
             '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' % 
-            (hap_str, chrom, type, str(loc), str(loc+offset), orig, alts[allele-1], str(new_offset), str(offset_other) )
+            (hap_str, chrom, v_type, str(loc), str(loc+offset), orig, alts[allele-1], str(new_offset), str(offset_other) )
         )
         offset = new_offset
         head = loc + len(orig)
     
     return head, hap, offset
 
+
+def update_variant(
+    row,
+    col,
+    ld_hap,
+    indiv,
+    indels,
+    data_source,
+    is_ld,
+    f_var,
+    f_vcf,
+    dict_genome,
+    dict_genome_B,
+    offsetA,
+    offsetB,
+    headA,
+    headB
+):
+    '''
+    Update a variant, which may have one or two alleles
+    '''
+
+    chrom = row[0]
+    loc = int(row[1])
+    orig = row[3]
+    alts = row[4].split(',')
+
+    if is_ld:
+        alleles = row[col].split('|')
+        # always put the haplotype as alleleA for simplicity
+        # the haplotype is not limited to gt[0] (it is randomly chose)
+        alleleA = int(alleles[ld_hap])
+        alleleB = 0
+    elif indiv != None:
+        # no `indiv` selected, take the allele
+        alleles = row[col].split('|')
+        alleleA = int(alleles[0])
+        alleleB = int(alleles[1])
+    else:
+        #: always uses allele "1"
+        alleleA = 1
+        alleleB = 0
+        
+    if alleleA > 0:
+        headA, dict_genome[chrom][1], offsetA = update_allele(
+            orig=orig,
+            alts=alts,
+            allele=alleleA,
+            indels=indels,
+            head=headA,
+            loc=loc,
+            f_var=f_var,
+            hap=dict_genome[chrom][1],
+            hap_str='A',
+            offset=offsetA,
+            offset_other=offsetB,
+            chrom=chrom
+        )
+    
+    if alleleB > 0 and indiv != None:
+        headB, dict_genome_B[chrom][1], offsetB = update_allele(
+            orig=orig,
+            alts=alts,
+            allele=alleleB,
+            indels=indels,
+            head=headB,
+            loc=loc,
+            f_var=f_var,
+            hap=dict_genome_B[chrom][1],
+            hap_str='B',
+            offset=offsetB,
+            offset_other=offsetA,
+            chrom=chrom
+        )
+
+    if (alleleA > 0) or \
+        (alleleB > 0 and indiv != None):
+            if data_source == '1kg':
+                if indiv != None:
+                    f_vcf.write('\t'.join(row[:9]) + f'\t{row[col]}\n')
+                else:
+                    f_vcf.write('\t'.join(row[:9]) + '\n')
+            else:
+                f_vcf.write(line)
+    return headA, dict_genome, offsetA, headB, dict_genome_B, offsetB
+
 def update_genome(
     indiv,
-    seq,
-    label,
+    dict_genome,
     vcf,
-    chrom,
     out_prefix,
     indels,
     var_only,
@@ -126,14 +274,21 @@ def update_genome(
     gnomad_pop_count,
     gnomad_af_th
 ):
-    #: assertions
+    '''
+    Handles variant updating for the entire genome. 
+    This function mainly handles different updating settings and reads the VCF file.
+
+    Variant updating follows the heirarchy:
+        update_genome() -> update_variant() -> update_allele()
+        - genome-level     - variant-level     - allele-level
+    '''
+    # assertions
     if is_ld:
         assert indiv == None
-
-    #: currently only supports 1000 Genomes ('1kg') and GnomAD ('gnomad') datasets
+    # currently only supports 1000 Genomes ('1kg') and GnomAD ('gnomad') datasets
     assert data_source in ['1kg', 'gnomad']
     if data_source == 'gnomad':
-        #: GnomAD has no phasing information
+        # GnomAD has no phasing information
         assert indiv == None
         assert is_ld == False
         assert exclude_list == ''
@@ -141,22 +296,10 @@ def update_genome(
     '''
     ##fileformat=VCFv4.1
     '''
-    hapA = list(seq[:])
-    hapB = list(seq[:])
-    # if var_only == 0:
-    if not var_only:
-        if indiv != None:
-            fA = open(out_prefix + '_hapA.fa', 'w')
-            split_label = label.split()
-            label_A = split_label[0] + 'A ' + ' '.join(split_label[1:]) + '\n'
-            fA.write(label_A)
-            fB = open(out_prefix + '_hapB.fa', 'w')
-            label_B = split_label[0] + 'B ' + ' '.join(split_label[1:]) + '\n'
-            fB.write(label_B)
-        else:
-            fA = open(out_prefix + '.fa', 'w')
-            fA.write(label)
-
+    if indiv != None:
+        dict_genome_B = copy.deepcopy(dict_genome)
+    else:
+        dict_genome_B = None
     f_var = open(out_prefix + '.var', 'w')
     f_vcf = open(out_prefix + '.vcf', 'w')
 
@@ -168,12 +311,15 @@ def update_genome(
         f = open(vcf, 'r')
     else:
         f = sys.stdin
+
     labels = None
-    line_id = 0
     offsetA = 0
     offsetB = 0
     headA = 0
     headB = 0
+    chrom = ''
+    ld_hap = None
+
     if data_source == 'gnomad':
         num_haps = gnomad_pop_count
     else:
@@ -189,26 +335,20 @@ def update_genome(
             f_vcf.write(line)
             continue
         if line[0] == '#':
-            f_vcf.write(line)
-            labels = line.rstrip().split('\t')
-            if data_source == '1kg':
-                num_haps = 2 * (len(labels) - 9)
-            #: if "indiv" is set, select corresponding columns
-            if indiv != None:
-                col = None
-                for i in range(9, len(labels)):
-                    if labels[i] == indiv:
-                        col = i
-                if not col:
-                    print('Error! Couldn\'t find individual %s in VCF' % indiv)
-                    exit(1)
+            col, num_haps, labels = process_vcf_header(line, indiv, f_vcf, data_source)
             continue
-        row = line.rstrip().split('\t')
-        # type = get_mutation_type(row[7])
-        type = get_mutation_type(row[3], row[4])
 
-        if row[0] != chrom and row[0] != 'chr' + chrom:
-            continue
+        row = line.rstrip().split('\t')
+        v_type = get_mutation_type(row[3], row[4])
+
+        # switch to a new contig
+        # we assume variants at different contigs are not interleaved
+        if row[0] != chrom:
+            headA = 0
+            headB = 0
+            offsetA = 0
+            offsetB = 0
+            chrom = row[0]
         loc = int(row[1])
 
         #: filter based on gnomad_af_th if it is set (gnomad only)
@@ -220,10 +360,7 @@ def update_genome(
         #: no LD stochastic update for 1kg and gnomad
         if is_stochastic and is_ld == False:
             freq = get_allele_freq(row[7], num_haps, data_source, gnomad_ac_field)
-            # print ('freq', freq)
             if freq < 0:
-                # print ('Warning! gnomad_ac_field ({}) is not found'.format(gnomad_ac_field))
-                # print (line)
                 continue
             #: only updates the random number when exceeding current block
             if loc >= current_block_pos + block_size:
@@ -234,6 +371,7 @@ def update_genome(
                 # print ('updt rr = {0}, block_pos = {1}'.format(rr, current_block_pos))
 
             if rr > freq:
+                # skip this allele
                 continue
             # print ('selected, rr = {}'.format(rr), row[:2], freq)
 
@@ -241,7 +379,9 @@ def update_genome(
         if is_stochastic and is_ld and data_source == '1kg':
             if loc >= current_block_pos + block_size:
                 while 1:
+                    # randomly pick an individual
                     ld_indiv = random.choice(labels[9:])
+                    # randomly pick a haplotype
                     ld_hap = random.choice([0,1])
                     if ld_indiv in exclude_list:
                         print ('exclude {0}: {1}-{2}'.format(current_block_pos, ld_indiv, ld_hap))
@@ -255,74 +395,49 @@ def update_genome(
                         exit()    
                     break    
 
-        #: supports tri-allelic
-        # if type == 'SNP' or (indels and type in ['INDEL', 'SNP,INDEL']):
-        if type == 'SNP' or (indels and type in ['INDEL', 'MULT']):
-            orig = row[3]
-            alts = row[4].split(',')
-
-            if is_ld:
-                alleles = row[col].split('|')
-                alleleA = int(alleles[ld_hap])
-                alleleB = 0
-            elif indiv != None:
-                alleles = row[col].split('|')
-                alleleA = int(alleles[0])
-                alleleB = int(alleles[1])
-            else:
-                #: always uses allele "1"
-                alleleA = 1
-                alleleB = 0
-                
-            if alleleA > 0:
-                headA, hapA, offsetA = update_allele(
-                    orig=orig,
-                    alts=alts,
-                    allele=alleleA,
-                    indels=indels,
-                    head=headA,
-                    loc=loc,
-                    f_var=f_var,
-                    hap=hapA,
-                    hap_str='A',
-                    offset=offsetA,
-                    offset_other=offsetB,
-                    chrom=chrom
-                )
+        if v_type == 'SNP' or (indels and v_type in ['INDEL', 'MULT']):
+            headA, dict_genome, offsetA, headB, dict_genome_B, offsetB = update_variant(
+                row = row,
+                col = col,
+                ld_hap = ld_hap,
+                indiv = indiv,
+                indels = indels,
+                data_source = data_source,
+                is_ld = is_ld,
+                f_var = f_var,
+                f_vcf = f_vcf,
+                dict_genome = dict_genome,
+                dict_genome_B = dict_genome_B,
+                offsetA = offsetA,
+                offsetB = offsetB,
+                headA = headA,
+                headB = headB
+            )
             
-            if alleleB > 0 and indiv != None:
-                headB, hapB, offsetB = update_allele(
-                    orig=orig,
-                    alts=alts,
-                    allele=alleleB,
-                    indels=indels,
-                    head=headB,
-                    loc=loc,
-                    f_var=f_var,
-                    hap=hapB,
-                    hap_str='B',
-                    offset=offsetB,
-                    offset_other=offsetA,
-                    chrom=chrom
-                )
-
-            if (alleleA > 0) or \
-                (alleleB > 0 and indiv != None):
-                f_vcf.write(line)
-            line_id += 1
-    
     f_vcf.close()
     f_var.close()
     
     if not var_only:
-        for i in range(0, len(hapA), 60):
-            fA.write(''.join(hapA[i:i+60])  + '\n')
-        fA.close()
+        if indiv:
+            # diploid output genome if `indiv` is set
+            write_to_fasta(dict_genome, out_prefix, '_hapA')
+            write_to_fasta(dict_genome_B, out_prefix, '_hapB')
+        else:
+            # haploid, no suffix
+            write_to_fasta(dict_genome, out_prefix, '')
 
-        if indiv != None:
-            for i in range(0, len(hapB), 60):
-                fB.write(''.join(hapB[i:i+60])  + '\n') 
-            fB.close()
+        # # write hapB sequence when `indiv` is set (diploid)
+        # if indiv != None:
+        #     fB = open(f'{out_prefix}_hapB.fa', 'w')
+        #     # show output in lexical order
+        #     # for key in sorted(dict_genome_B.keys()):
+        #     for key in dict_genome_B.keys():
+        #         # write full contig name
+        #         fB.write(f'>{dict_genome_B[key][0]}\n')
+        #         # write sequence, 60 chars per line
+        #         for i in range(0, len(dict_genome_B[key][1]), 60):
+        #             fB.write(''.join(dict_genome_B[key][1][i: i+60]) + '\n')
+        #     fB.close()
     f.close()
 
 def add_alt(genome, loc, orig, alt, offset, overlap_ins):
@@ -364,24 +479,45 @@ def add_alt(genome, loc, orig, alt, offset, overlap_ins):
 
     return offset
 
-def read_chrom(ref, chrom):
-    with open(ref, 'r') as f_in:
-        label = None
-        seq = ''
-        for line in f_in:
-            if line[0] == '>':
-                if label:
-                    return label, seq
-                curr_chrom = line[1:].split(' ')[0]
-                curr_chrom = curr_chrom.rstrip()
-                if (curr_chrom == chrom) or (curr_chrom == 'chr' + chrom):
-                    label = line
-            elif label:
-                seq += line.rstrip()
-        if label == None:
-            print ('Error: no matched chromosome. Label = {}'.format(chrom))
-            exit ()
-        return label, seq
+def read_genome(fn_genome):
+    '''
+    Read a fasta file and returns a dictionary storing contig sequences
+
+    Args:
+        fn_genome: file name of the genome (in fasta format)
+
+    Return:
+        dict_genome (dict)
+            key: short contig name (from '>' to the first space)
+            value: [full contig name (string), sequence (list)]
+                sequence is represented in lists for easier modification later
+    '''
+    if not (sys.version_info.major == 3 and sys.version_info.minor >= 6):
+        # Use OrderedDict to maintain dictionary oder as input
+        dict_genome = OrderedDict()
+    else:
+        # Python 3.6's dict is now ordered by insertion order
+        dict_genome = {}
+    
+    f_genome = open(fn_genome, 'r')
+    curr_contig = ''
+    curr_seq = ''
+    full_contig_name = ''
+    for line in f_genome:
+        line = line.rstrip()
+        if line[0] == '>':
+            # update previous contig
+            if curr_contig != '':
+                dict_genome[curr_contig] = [full_contig_name, list(curr_seq[:])]
+            full_contig_name = line[1:]
+            curr_contig = line.split()[0][1:]
+            curr_seq = ''
+        else:
+            curr_seq += line
+    if curr_contig != '':
+        dict_genome[curr_contig] = [full_contig_name, list(curr_seq[:])]
+
+    return dict_genome
 
 if __name__ == '__main__':
 
@@ -394,8 +530,10 @@ if __name__ == '__main__':
     parser.add_argument(
         '-v', '--vcf', type=str, help="Path to VCF file containing mutation information"
     )
+    # I'd like to deprecate this
     parser.add_argument(
-        '-c', '--chrom', type=str, required=True, help="Chromosome to process"
+        '-c', '--chrom', type=str, help="Chromosome to process"
+        # '-c', '--chrom', type=str, required=True, help="Chromosome to process"
     )
     parser.add_argument(
         '-op', '--out-prefix', type=str, required=True, help="Path to output prefix"
@@ -444,7 +582,7 @@ if __name__ == '__main__':
     args = parser.parse_args(sys.argv[1:])
 
     if args.name == None:
-        print ('Note: no individual specified, all variants in chrom %s are included' % args.chrom)
+        print ('Note: no individual specified, all variants are considered')
     # if args.stochastic == 1:
     if args.stochastic:
         print ('Note: stochastic update is enabled')
@@ -452,13 +590,11 @@ if __name__ == '__main__':
             random.seed(args.rand_seed)
             print ('Set random seed: {}'.format(args.rand_seed))
 
-    label, genome = read_chrom(args.ref, args.chrom)
+    dict_genome = read_genome(args.ref)
     update_genome(
         indiv = args.name,
-        seq = genome,
-        label = label,
+        dict_genome = dict_genome,
         vcf = args.vcf,
-        chrom = args.chrom,
         out_prefix = args.out_prefix,
         indels = args.include_indels,
         var_only = args.var_only,
