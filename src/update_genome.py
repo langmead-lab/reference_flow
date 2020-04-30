@@ -64,7 +64,7 @@ def get_allele_freq(info, num_haps, data_source, gnomad_ac_field):
     return -1
 
 
-def process_vcf_header(line, indiv, f_vcf, data_source):
+def process_vcf_header(line, indiv, f_vcf, data_source, is_ld):
     '''
     Process the header line of a VCF file
 
@@ -73,6 +73,7 @@ def process_vcf_header(line, indiv, f_vcf, data_source):
         indiv (string): targeted sample (can be None)
         f_vcf (file): file that we are writing to
         data_source (string): project that generates the call set
+        is_ld (boolean): if maintain local LD
 
     Returns:
         col (int/None): column index for `indiv`, None if `indiv` is not provided
@@ -93,8 +94,11 @@ def process_vcf_header(line, indiv, f_vcf, data_source):
         f_vcf.write('\t'.join(labels[:9]) + f'\t{labels[col]}\n')
     else:
         if data_source == '1kg':
-            # skip sample genotype columns
-            f_vcf.write('\t'.join(labels[:9]) + '\n')
+            if is_ld:
+                f_vcf.write('\t'.join(labels[:9]) + '\tLD_SAMPLE\n')
+            else:
+                # skip sample genotype columns
+                f_vcf.write('\t'.join(labels[:9]) + '\n')
         else:
             f_vcf.write(line)
 
@@ -188,7 +192,8 @@ def update_variant(
     offsetA,
     offsetB,
     headA,
-    headB
+    headB,
+    ld_indiv
 ):
     '''
     Update a variant, which may have one or two alleles
@@ -253,7 +258,10 @@ def update_variant(
                 if indiv != None:
                     f_vcf.write('\t'.join(row[:9]) + f'\t{row[col]}\n')
                 else:
-                    f_vcf.write('\t'.join(row[:9]) + '\n')
+                    if is_ld:
+                        f_vcf.write('\t'.join(row[:9]) + f':SP\t{row[col]}:{ld_indiv}\n')
+                    else:
+                        f_vcf.write('\t'.join(row[:9]) + '\n')
             else:
                 f_vcf.write(line)
     return headA, dict_genome, offsetA, headB, dict_genome_B, offsetB
@@ -319,6 +327,7 @@ def update_genome(
     headB = 0
     chrom = ''
     ld_hap = None
+    ld_indiv = None
 
     if data_source == 'gnomad':
         num_haps = gnomad_pop_count
@@ -329,13 +338,20 @@ def update_genome(
     rr = 0 # initial number for random.random()
     exclude_list = exclude_list.split(',')
 
+    if is_ld:
+        header_to_add_format = True
+    else:
+        header_to_add_format = False
+
     for line in f:
         #: Skip header lines
         if line[0] == '#' and line[1] == '#':
+            if header_to_add_format and line.startswith('##FORMAT'):
+                f_vcf.write('##FORMAT=<ID=SP,Number=1,Type=String,Description="Sample from which genotype is selected">\n')
             f_vcf.write(line)
             continue
         if line[0] == '#':
-            col, num_haps, labels = process_vcf_header(line, indiv, f_vcf, data_source)
+            col, num_haps, labels = process_vcf_header(line, indiv, f_vcf, data_source, is_ld)
             continue
 
         row = line.rstrip().split('\t')
@@ -411,7 +427,8 @@ def update_genome(
                 offsetA = offsetA,
                 offsetB = offsetB,
                 headA = headA,
-                headB = headB
+                headB = headB,
+                ld_indiv = ld_indiv
             )
             
     f_vcf.close()
@@ -532,7 +549,7 @@ if __name__ == '__main__':
     )
     # I'd like to deprecate this
     parser.add_argument(
-        '-c', '--chrom', type=str, help="Chromosome to process"
+        '-c', '--chrom', type=str, help="Chromosome to process (deprecated)"
         # '-c', '--chrom', type=str, required=True, help="Chromosome to process"
     )
     parser.add_argument(
