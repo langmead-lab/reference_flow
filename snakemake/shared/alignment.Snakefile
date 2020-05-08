@@ -4,12 +4,12 @@ rule align_to_major:
         reads1 = READS1,
         reads2 = READS2,
         idx = expand(
-            os.path.join(DIR, 'major/indexes/wg-maj.{idx}.bt2'),
+            os.path.join(DIR, 'major/indexes/' + EXP_LABEL + '-maj.{idx}.bt2'),
             idx = IDX_ITEMS)
     params:
-        index = os.path.join(DIR, 'major/indexes/wg-maj')
+        index = os.path.join(DIR, 'major/indexes/' + EXP_LABEL + '-maj')
     output:
-        sam = os.path.join(DIR_FIRST_PASS, 'wg-major.sam')
+        sam = os.path.join(DIR_FIRST_PASS, EXP_LABEL + '-major.sam')
     threads: THREADS
     shell:
         'bowtie2 --threads {THREADS} -x {params.index} -1 {input.reads1} -2 {input.reads2} -S {output.sam}'
@@ -21,19 +21,19 @@ rule refflow_split_aln_by_mapq:
     This is under a paired-end configuration
     '''
     input:
-        sam = os.path.join(DIR_FIRST_PASS, 'wg-major.sam')
+        sam = os.path.join(DIR_FIRST_PASS, EXP_LABEL + '-major.sam')
     output:
         highq = os.path.join(DIR_FIRST_PASS,
-            'wg-major-mapqgeq' + ALN_MAPQ_THRSD + '.sam'),
+            EXP_LABEL + '-major-mapqgeq' + ALN_MAPQ_THRSD + '.sam'),
         lowq = os.path.join(DIR_FIRST_PASS,
-            'wg-major-mapqlt' + ALN_MAPQ_THRSD + '.sam'),
+            EXP_LABEL + '-major-mapqlt' + ALN_MAPQ_THRSD + '.sam'),
         lowq_reads1 = os.path.join(DIR_FIRST_PASS,
-            'wg-major-mapqlt' + ALN_MAPQ_THRSD + '_1.fq'),
+            EXP_LABEL + '-major-mapqlt' + ALN_MAPQ_THRSD + '_1.fq'),
         lowq_reads2 = os.path.join(DIR_FIRST_PASS,
-            'wg-major-mapqlt' + ALN_MAPQ_THRSD + '_2.fq')
+            EXP_LABEL + '-major-mapqlt' + ALN_MAPQ_THRSD + '_2.fq')
     params:
         fastq = os.path.join(DIR_FIRST_PASS,
-            'wg-major-mapqlt' + ALN_MAPQ_THRSD),
+            EXP_LABEL + '-major-mapqlt' + ALN_MAPQ_THRSD),
         single_end = False,
         split_strategy = 'optimistic'
     shell:
@@ -44,9 +44,9 @@ rule refflow_split_aln_by_mapq:
 rule refflow_align_secondpass_paired_end:
     input:
         reads1 = os.path.join(DIR_FIRST_PASS,
-            'wg-major-mapqlt' + ALN_MAPQ_THRSD + '_1.fq'),
+            EXP_LABEL + '-major-mapqlt' + ALN_MAPQ_THRSD + '_1.fq'),
         reads2 = os.path.join(DIR_FIRST_PASS,
-            'wg-major-mapqlt' + ALN_MAPQ_THRSD + '_2.fq'),
+            EXP_LABEL + '-major-mapqlt' + ALN_MAPQ_THRSD + '_2.fq'),
         idx1 = os.path.join(DIR_POP_GENOME_BLOCK_IDX, WG_POP_GENOME_SUFFIX + '.1.bt2'),
         idx2 = os.path.join(DIR_POP_GENOME_BLOCK_IDX, WG_POP_GENOME_SUFFIX + '.2.bt2'),
         idx3 = os.path.join(DIR_POP_GENOME_BLOCK_IDX, WG_POP_GENOME_SUFFIX + '.3.bt2'),
@@ -66,11 +66,11 @@ rule refflow_merge_secondpass:
         sam = expand(
             PREFIX_SECOND_PASS + '.sam',
             INDIV = INDIV, GROUP = GROUP),
-        maj = os.path.join(DIR_FIRST_PASS, 'wg-major-mapqlt{}.sam'.format(ALN_MAPQ_THRSD))
+        maj = os.path.join(DIR_FIRST_PASS, EXP_LABEL + '-major-mapqlt{}.sam'.format(ALN_MAPQ_THRSD))
     output:
-        path = os.path.join(DIR_SECOND_PASS, 'wg-major-{}-{}.paths'.format(ALN_MAPQ_THRSD, POP_DIRNAME)),
-        label = os.path.join(DIR_SECOND_PASS, 'wg-major-{}-{}.ids'.format(ALN_MAPQ_THRSD, POP_DIRNAME)),
-        merge_paths = os.path.join(DIR_SECOND_PASS, 'wg-major-{}-{}.merge_paths'.format(ALN_MAPQ_THRSD, POP_DIRNAME))
+        path = os.path.join(DIR_SECOND_PASS, EXP_LABEL + '-major-{}-{}.paths'.format(ALN_MAPQ_THRSD, POP_DIRNAME)),
+        label = os.path.join(DIR_SECOND_PASS, EXP_LABEL + '-major-{}-{}.ids'.format(ALN_MAPQ_THRSD, POP_DIRNAME)),
+        merge_paths = os.path.join(DIR_SECOND_PASS, EXP_LABEL + '-major-{}-{}.merge_paths'.format(ALN_MAPQ_THRSD, POP_DIRNAME))
     params:
         prefix = os.path.join(DIR_SECOND_PASS, '2ndpass')
     run:
@@ -82,7 +82,7 @@ rule refflow_merge_secondpass:
         shell('echo {input.maj} > {output.path};')
         shell('echo "maj" > {output.label};')
         for g in GROUP:
-            fn = os.path.join(dir_2p, 'wg-major-{}-{}-{}.sam'.format(ALN_MAPQ_THRSD, g, POP_DIRNAME))
+            fn = os.path.join(dir_2p, EXP_LABEL + '-major-{}-{}-{}.sam'.format(ALN_MAPQ_THRSD, g, POP_DIRNAME))
             shell('ls {fn} >> {output.path};')
             shell('echo {g} >> {output.label};')
         shell('{PYTHON} {DIR_SCRIPTS}/merge_incremental.py -ns {output.path} \
@@ -94,12 +94,12 @@ Paired-end, but a segment can align to different references, which is not accept
 '''
 # rule refflow_split_aln_by_mapq:
 #     input:
-#         sam = os.path.join(dir_first_pass, 'wg-major.sam')
+#         sam = os.path.join(dir_first_pass, EXP_LABEL + '-major.sam')
 #     output:
 #         highq = os.path.join(DIR_FIRST_PASS,
-#             'wg-major-mapqgeq' + ALN_MAPQ_THRSD + '.sam'),
+#             EXP_LABEL + '-major-mapqgeq' + ALN_MAPQ_THRSD + '.sam'),
 #         lowq = os.path.join(DIR_FIRST_PASS,
-#             'wg-major-mapqlt' + ALN_MAPQ_THRSD + '.sam'),
+#             EXP_LABEL + '-major-mapqlt' + ALN_MAPQ_THRSD + '.sam'),
 #     shell:
 #         'awk -v var="{ALN_MAPQ_THRSD}" \
 #         \'{{ if ($5 >= var || $1 ~ /^@/) {{ print }} }}\' {input.sam} > \
@@ -111,10 +111,10 @@ Paired-end, but a segment can align to different references, which is not accept
 # # split lowq sam into pairs and singletons
 # rule refflow_split_lowq_sam:
 #     input:
-#         sam = os.path.join(DIR_FIRST_PASS, 'wg-major-mapqlt10.sam')
+#         sam = os.path.join(DIR_FIRST_PASS, EXP_LABEL + '-major-mapqlt10.sam')
 #     output:
-#         singleton = os.path.join(DIR_FIRST_PASS, 'wg-major-mapqlt10-singleton.sam'),
-#         paired = os.path.join(DIR_FIRST_PASS, 'wg-major-mapqlt10-paired.sam')
+#         singleton = os.path.join(DIR_FIRST_PASS, EXP_LABEL + '-major-mapqlt10-singleton.sam'),
+#         paired = os.path.join(DIR_FIRST_PASS, EXP_LABEL + '-major-mapqlt10-paired.sam')
 #     run:
 #         fs_out = open(output.singleton, 'w')
 #         f_out = open(output.paired, 'w')
@@ -144,33 +144,33 @@ Paired-end, but a segment can align to different references, which is not accept
 # 
 # rule refflow_sam_to_fastq_paired:
 #     input:
-#         paired = os.path.join(DIR_FIRST_PASS, 'wg-major-mapqlt10-paired.sam')
+#         paired = os.path.join(DIR_FIRST_PASS, EXP_LABEL + '-major-mapqlt10-paired.sam')
 #     output:
 #         lowq_reads1 = os.path.join(DIR_FIRST_PASS,
-#             'wg-major-mapqlt' + ALN_MAPQ_THRSD + '_1.fq'),
+#             EXP_LABEL + '-major-mapqlt' + ALN_MAPQ_THRSD + '_1.fq'),
 #         lowq_reads2 = os.path.join(DIR_FIRST_PASS,
-#             'wg-major-mapqlt' + ALN_MAPQ_THRSD + '_2.fq')
+#             EXP_LABEL + '-major-mapqlt' + ALN_MAPQ_THRSD + '_2.fq')
 #     shell:
 #         #'samtools fastq -1 {output.lowq_reads1} -2 {output.lowq_reads2} -n {output.lowq}'
 #         'samtools fastq -n {input.paired} -1 {output.lowq_reads1} -2 {output.lowq_reads2}'
 # 
 # rule refflow_sam_to_fastq_singleton:
 #     input:
-#         singleton = os.path.join(DIR_FIRST_PASS, 'wg-major-mapqlt10-singleton.sam'),
+#         singleton = os.path.join(DIR_FIRST_PASS, EXP_LABEL + '-major-mapqlt10-singleton.sam'),
 #     output:
 #         lowq_reads_singleton = os.path.join(DIR_FIRST_PASS,
-#             'wg-major-mapqlt' + ALN_MAPQ_THRSD + '_s.fq')
+#             EXP_LABEL + '-major-mapqlt' + ALN_MAPQ_THRSD + '_s.fq')
 #     shell:
 #         'samtools fastq -n {input.singleton} > {output.lowq_reads_singleton}'
 # 
 # rule refflow_align_secondpass_paired_end:
 #     input:
 #         reads1 = os.path.join(DIR_FIRST_PASS,
-#             'wg-major-mapqlt' + ALN_MAPQ_THRSD + '_1.fq'),
+#             EXP_LABEL + '-major-mapqlt' + ALN_MAPQ_THRSD + '_1.fq'),
 #         reads2 = os.path.join(DIR_FIRST_PASS,
-#             'wg-major-mapqlt' + ALN_MAPQ_THRSD + '_2.fq'),
+#             EXP_LABEL + '-major-mapqlt' + ALN_MAPQ_THRSD + '_2.fq'),
 #         #reads = os.path.join(DIR_FIRST_PASS,
-#         #    'wg-major-mapqlt' + ALN_MAPQ_THRSD + '.fq'),
+#         #    EXP_LABEL + '-major-mapqlt' + ALN_MAPQ_THRSD + '.fq'),
 #         idx1 = os.path.join(DIR_POP_GENOME_BLOCK_IDX, WG_POP_GENOME_SUFFIX + '.1.bt2'),
 #         idx2 = os.path.join(DIR_POP_GENOME_BLOCK_IDX, WG_POP_GENOME_SUFFIX + '.2.bt2'),
 #         idx3 = os.path.join(DIR_POP_GENOME_BLOCK_IDX, WG_POP_GENOME_SUFFIX + '.3.bt2'),
@@ -189,7 +189,7 @@ Paired-end, but a segment can align to different references, which is not accept
 # rule refflow_align_secondpass_singleton:
 #     input:
 #         reads = os.path.join(DIR_FIRST_PASS,
-#             'wg-major-mapqlt' + ALN_MAPQ_THRSD + '_s.fq'),
+#             EXP_LABEL + '-major-mapqlt' + ALN_MAPQ_THRSD + '_s.fq'),
 #         idx1 = os.path.join(DIR_POP_GENOME_BLOCK_IDX, WG_POP_GENOME_SUFFIX + '.1.bt2'),
 #         idx2 = os.path.join(DIR_POP_GENOME_BLOCK_IDX, WG_POP_GENOME_SUFFIX + '.2.bt2'),
 #         idx3 = os.path.join(DIR_POP_GENOME_BLOCK_IDX, WG_POP_GENOME_SUFFIX + '.3.bt2'),
@@ -210,11 +210,11 @@ Paired-end, but a segment can align to different references, which is not accept
 #         sam = expand(
 #             PREFIX_SECOND_PASS + '.sam',
 #             INDIV = INDIV, GROUP = GROUP),
-#         maj = os.path.join(DIR_FIRST_PASS, 'wg-major-mapqlt10-paired.sam')
+#         maj = os.path.join(DIR_FIRST_PASS, EXP_LABEL + '-major-mapqlt10-paired.sam')
 #     output:
-#         path = os.path.join(DIR_SECOND_PASS, 'wg-major-{}-{}.paths'.format(ALN_MAPQ_THRSD, POP_DIRNAME)),
-#         id = os.path.join(DIR_SECOND_PASS, 'wg-major-{}-{}.ids'.format(ALN_MAPQ_THRSD, POP_DIRNAME)),
-#         merge_paths = os.path.join(DIR_SECOND_PASS, 'wg-major-{}-{}.merge_paths'.format(ALN_MAPQ_THRSD, POP_DIRNAME))
+#         path = os.path.join(DIR_SECOND_PASS, EXP_LABEL + '-major-{}-{}.paths'.format(ALN_MAPQ_THRSD, POP_DIRNAME)),
+#         id = os.path.join(DIR_SECOND_PASS, EXP_LABEL + '-major-{}-{}.ids'.format(ALN_MAPQ_THRSD, POP_DIRNAME)),
+#         merge_paths = os.path.join(DIR_SECOND_PASS, EXP_LABEL + '-major-{}-{}.merge_paths'.format(ALN_MAPQ_THRSD, POP_DIRNAME))
 #     params:
 #         prefix = os.path.join(DIR_SECOND_PASS, '2ndpass')
 #     run:
@@ -226,7 +226,7 @@ Paired-end, but a segment can align to different references, which is not accept
 #         shell('echo {input.maj} > {output.path};')
 #         shell('echo "maj" > {output.id};')
 #         for g in GROUP:
-#             fn = os.path.join(dir_2p, 'wg-major-{}-{}-{}.sam'.format(ALN_MAPQ_THRSD, g, POP_DIRNAME))
+#             fn = os.path.join(dir_2p, EXP_LABEL + '-major-{}-{}-{}.sam'.format(ALN_MAPQ_THRSD, g, POP_DIRNAME))
 #             shell('ls {fn} >> {output.path};')
 #             shell('echo {g} >> {output.id};')
 #         shell('{PYTHON} {DIR_SCRIPTS}/merge_incremental.py -ns {output.path} \
@@ -238,11 +238,11 @@ Paired-end, but a segment can align to different references, which is not accept
 #         sam = expand(
 #             PREFIX_SECOND_PASS + '-singleton.sam',
 #             INDIV = INDIV, GROUP = GROUP),
-#         maj = os.path.join(DIR_FIRST_PASS, 'wg-major-mapqlt10-singleton.sam')
+#         maj = os.path.join(DIR_FIRST_PASS, EXP_LABEL + '-major-mapqlt10-singleton.sam')
 #     output:
-#         path = os.path.join(DIR_SECOND_PASS, 'wg-major-{}-{}-singleton.paths'.format(ALN_MAPQ_THRSD, POP_DIRNAME)),
-#         id = os.path.join(DIR_SECOND_PASS, 'wg-major-{}-{}-singleton.ids'.format(ALN_MAPQ_THRSD, POP_DIRNAME)),
-#         merge_paths = os.path.join(DIR_SECOND_PASS, 'wg-major-{}-{}-singleton.merge_paths'.format(ALN_MAPQ_THRSD, POP_DIRNAME))
+#         path = os.path.join(DIR_SECOND_PASS, EXP_LABEL + '-major-{}-{}-singleton.paths'.format(ALN_MAPQ_THRSD, POP_DIRNAME)),
+#         id = os.path.join(DIR_SECOND_PASS, EXP_LABEL + '-major-{}-{}-singleton.ids'.format(ALN_MAPQ_THRSD, POP_DIRNAME)),
+#         merge_paths = os.path.join(DIR_SECOND_PASS, EXP_LABEL + '-major-{}-{}-singleton.merge_paths'.format(ALN_MAPQ_THRSD, POP_DIRNAME))
 #     params:
 #         prefix = os.path.join(DIR_SECOND_PASS, '2ndpass')
 #     run:
@@ -254,7 +254,7 @@ Paired-end, but a segment can align to different references, which is not accept
 #         shell('echo {input.maj} > {output.path};')
 #         shell('echo "maj-singleton" > {output.id};')
 #         for g in GROUP:
-#             fn = os.path.join(dir_2p, 'wg-major-{}-{}-{}-singleton.sam'.format(ALN_MAPQ_THRSD, g, POP_DIRNAME))
+#             fn = os.path.join(dir_2p, EXP_LABEL + '-major-{}-{}-{}-singleton.sam'.format(ALN_MAPQ_THRSD, g, POP_DIRNAME))
 #             shell('ls {fn} >> {output.path};')
 #             shell('echo {g}-singleton >> {output.id};')
 #         shell('{PYTHON} {DIR_SCRIPTS}/merge_incremental.py -ns {output.path} \
@@ -264,10 +264,10 @@ Paired-end, but a segment can align to different references, which is not accept
 rule check_alignment_refflow:
     input:
         merge_paths = expand(
-            os.path.join(DIR_SECOND_PASS, 'wg-major-{}-{}.merge_paths'.format(ALN_MAPQ_THRSD, POP_DIRNAME)),
+            os.path.join(DIR_SECOND_PASS, EXP_LABEL + '-major-{}-{}.merge_paths'.format(ALN_MAPQ_THRSD, POP_DIRNAME)),
             INDIV = INDIV),
 #         merge_paths_singleton = expand(
-#             os.path.join(DIR_SECOND_PASS, 'wg-major-{}-{}-singleton.merge_paths'.format(ALN_MAPQ_THRSD, POP_DIRNAME)),
+#             os.path.join(DIR_SECOND_PASS, EXP_LABEL + '-major-{}-{}-singleton.merge_paths'.format(ALN_MAPQ_THRSD, POP_DIRNAME)),
 #             INDIV = INDIV)
     output:
         touch(temp(os.path.join(DIR, 'alignment_refflow.done')))

@@ -4,12 +4,12 @@ and sort the reads.
 '''
 rule liftover_lift_major_highq:
     input:
-        sam = os.path.join(DIR_FIRST_PASS, 'wg-major-mapqgeq{}.sam'.format(ALN_MAPQ_THRSD)),
-        lft = os.path.join(DIR_MAJOR, 'wg-major.lft')
+        sam = os.path.join(DIR_FIRST_PASS, EXP_LABEL + '-major-mapqgeq{}.sam'.format(ALN_MAPQ_THRSD)),
+        lft = os.path.join(DIR_MAJOR, EXP_LABEL + '-major.lft')
     output:
-        os.path.join(DIR_FIRST_PASS, 'wg-major-mapqgeq{}-liftover.sam'.format(ALN_MAPQ_THRSD))
+        os.path.join(DIR_FIRST_PASS, EXP_LABEL + '-major-mapqgeq{}-liftover.sam'.format(ALN_MAPQ_THRSD))
     params:
-        os.path.join(DIR_FIRST_PASS, 'wg-major-mapqgeq{}-liftover'.format(ALN_MAPQ_THRSD))
+        os.path.join(DIR_FIRST_PASS, EXP_LABEL + '-major-mapqgeq{}-liftover'.format(ALN_MAPQ_THRSD))
     threads: THREADS
     run:
         shell('{LIFTOVER} lift -a {input.sam} -l {input.lft} -p {params} -t {threads}')
@@ -17,17 +17,17 @@ rule liftover_lift_major_highq:
 #: Refflow -- second pass
 rule liftover_lift_refflow_secondpass_and_merge:
     input:
-        maj_fp = os.path.join(DIR_FIRST_PASS, 'wg-major-mapqgeq{}-liftover.sam'.format(ALN_MAPQ_THRSD)),
-        second_sam_path = os.path.join(DIR_SECOND_PASS, 'wg-major-{}-{}.merge_paths'.format(ALN_MAPQ_THRSD, POP_DIRNAME)),
-#         second_sam_path_singleton = os.path.join(DIR_SECOND_PASS, 'wg-major-{}-{}-singleton.merge_paths'.format(ALN_MAPQ_THRSD, POP_DIRNAME)),
+        maj_fp = os.path.join(DIR_FIRST_PASS, EXP_LABEL + '-major-mapqgeq{}-liftover.sam'.format(ALN_MAPQ_THRSD)),
+        second_sam_path = os.path.join(DIR_SECOND_PASS, EXP_LABEL + '-major-{}-{}.merge_paths'.format(ALN_MAPQ_THRSD, POP_DIRNAME)),
+#         second_sam_path_singleton = os.path.join(DIR_SECOND_PASS, EXP_LABEL + '-major-{}-{}-singleton.merge_paths'.format(ALN_MAPQ_THRSD, POP_DIRNAME)),
         lft_pop = expand(os.path.join(
             DIR_POP_GENOME, POP_DIRNAME + '/' +
-            'wg-superpop_{GROUP}_' + POP_DIRNAME + '.lft'),
+            EXP_LABEL + '-superpop_{GROUP}_' + POP_DIRNAME + '.lft'),
             GROUP = GROUP),
-        lft_maj = os.path.join(DIR_MAJOR, 'wg-major.lft'),
+        lft_maj = os.path.join(DIR_MAJOR, EXP_LABEL + '-major.lft'),
     output:
         lfted_refflow_sam = os.path.join(DIR_SECOND_PASS,
-            'wg-refflow-{}-{}-liftover.sam'.format(ALN_MAPQ_THRSD, POP_DIRNAME)),
+            EXP_LABEL + '-refflow-{}-{}-liftover.sam'.format(ALN_MAPQ_THRSD, POP_DIRNAME)),
         lfted_major_second_sam = os.path.join(DIR_SECOND_PASS, '2ndpass-maj-liftover.sam'),
         lfted_group_second_sam = [
             os.path.join(DIR_SECOND_PASS, '2ndpass-') + 
@@ -92,7 +92,7 @@ rule liftover_lift_refflow_secondpass_and_merge:
 rule check_elevate:
     input:
         expand(os.path.join(DIR_SECOND_PASS,
-            'wg-refflow-{}-{}-liftover.sam'.format(ALN_MAPQ_THRSD, POP_DIRNAME)),
+            EXP_LABEL + '-refflow-{}-{}-liftover.sam'.format(ALN_MAPQ_THRSD, POP_DIRNAME)),
         INDIV = INDIV)
     output:
         touch(temp(os.path.join(DIR, 'elevate.done')))
@@ -103,10 +103,10 @@ Sort SAM records
 rule sort_refflow:
     input:
         os.path.join(DIR_SECOND_PASS,
-            'wg-refflow-{}-{}-liftover.sam'.format(ALN_MAPQ_THRSD, POP_DIRNAME))
+            EXP_LABEL + '-refflow-{}-{}-liftover.sam'.format(ALN_MAPQ_THRSD, POP_DIRNAME))
     output:
         os.path.join(DIR_SECOND_PASS,
-            'wg-refflow-{}-{}-liftover-sorted.bam'.format(ALN_MAPQ_THRSD, POP_DIRNAME))
+            EXP_LABEL + '-refflow-{}-{}-liftover-sorted.bam'.format(ALN_MAPQ_THRSD, POP_DIRNAME))
     threads: 4
     run:
         shell('samtools sort -@ {threads} -o {output} -O BAM {input};')
@@ -114,7 +114,7 @@ rule sort_refflow:
 rule check_sort:
     input:
         expand(os.path.join(DIR_SECOND_PASS,
-            'wg-refflow-{}-{}-liftover-sorted.bam'.format(ALN_MAPQ_THRSD, POP_DIRNAME)), INDIV = INDIV),
+            EXP_LABEL + '-refflow-{}-{}-liftover-sorted.bam'.format(ALN_MAPQ_THRSD, POP_DIRNAME)), INDIV = INDIV),
     output:
         touch(temp(os.path.join(DIR, 'sort.done')))
 
