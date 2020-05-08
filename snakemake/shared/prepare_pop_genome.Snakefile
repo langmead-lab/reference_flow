@@ -14,15 +14,18 @@ rule prepare_pop_indiv:
         '-p {FAMILY} -sp {SPOP} -op {params.prefix}'
 
 rule build_pop_vcf:
+    '''
+    Filter VCF by population groups.
+    Each output VCF includes only indivs in the specified population group.
+    '''
     input:
-        vcf = PREFIX_VCF_F + '.vcf',
-        indiv_group = os.path.join(
-            DIR,
-            '1KG_indivs/sample_superpop_{GROUP}.txt'
-        )
+        # vcf = PREFIX_VCF_F + '.vcf',
+        vcf = os.path.join(DIR, EXP_LABEL + '_filtered.vcf'),
+        indiv_group = os.path.join(DIR, '1KG_indivs/sample_superpop_{GROUP}.txt')
     output:
-        vcf_gz = os.path.join(DIR_POP_GENOME,
-            'chr{CHROM}_superpop_{GROUP}.vcf.gz')
+        vcf_gz = os.path.join(DIR_POP_GENOME, EXP_LABEL + '_superpop_{GROUP}.vcf.gz')
+        # vcf_gz = os.path.join(DIR_POP_GENOME,
+        # 'chr{CHROM}_superpop_{GROUP}.vcf.gz')
     shell:
         '{BCFTOOLS} view -S {input.indiv_group} '
         '--force-samples {input.vcf} -V mnps,other -m2 -M2 | '
@@ -31,10 +34,10 @@ rule build_pop_vcf:
 rule get_pop_sample:
     input:
         vcf_gz = os.path.join(DIR_POP_GENOME,
-            'chr{CHROM}_superpop_{GROUP}.vcf.gz')
+            EXP_LABEL + '_superpop_{GROUP}.vcf.gz')
     output:
         vcf_header = os.path.join(DIR_POP_GENOME,
-            'chr{CHROM}_superpop_{GROUP}.samples')
+            EXP_LABEL + '_superpop_{GROUP}.samples')
     shell:
         '{BCFTOOLS} view -h {input.vcf_gz} | tail -1 '
         '> {output.vcf_header}'
@@ -42,13 +45,13 @@ rule get_pop_sample:
 rule filter_pop_vcf:
     input:
         vcf_gz = os.path.join(DIR_POP_GENOME,
-            'chr{CHROM}_superpop_{GROUP}.vcf.gz'),
+            EXP_LABEL + '_superpop_{GROUP}.vcf.gz'),
         vcf_header = os.path.join(DIR_POP_GENOME,
-            'chr{CHROM}_superpop_{GROUP}.samples')
+            EXP_LABEL + '_superpop_{GROUP}.samples')
     output:
         vcf = os.path.join(
             DIR_POP_GENOME,
-            'chr{CHROM}_superpop_{GROUP}_t' + str(POP_THRSD) + '.vcf'
+            EXP_LABEL + '_superpop_{GROUP}_t' + str(POP_THRSD) + '.vcf'
         )
     run:
         fn = list({input.vcf_header})[0]
@@ -65,78 +68,154 @@ rule build_pop_genome:
     input:
         vcf = os.path.join(
             DIR_POP_GENOME,
-            'chr{CHROM}_superpop_{GROUP}_t' + str(POP_THRSD) + '.vcf'
+            EXP_LABEL + '_superpop_{GROUP}_t' + str(POP_THRSD) + '.vcf'
         )
     output:
         os.path.join(
             DIR_POP_GENOME_BLOCK,
-            POP_GENOME_SUFFIX + '.fa'
+            WG_POP_GENOME_SUFFIX + '.fa'
         ),
         os.path.join(
             DIR_POP_GENOME_BLOCK,
-            POP_GENOME_SUFFIX + '.var'
+            WG_POP_GENOME_SUFFIX + '.var'
         ),
         os.path.join(
             DIR_POP_GENOME_BLOCK,
-            POP_GENOME_SUFFIX + '.vcf'
+            WG_POP_GENOME_SUFFIX + '.vcf'
         )
     params:
         prefix = os.path.join(
             DIR_POP_GENOME_BLOCK,
-            POP_GENOME_SUFFIX
+            WG_POP_GENOME_SUFFIX
         )
     run:
         if POP_STOCHASTIC == 1 and POP_USE_LD == 1:
             shell('{PYTHON} {DIR_SCRIPTS}/update_genome.py \
-                --ref {GENOME} --chrom {wildcards.CHROM} --vcf {input.vcf} \
+                --ref {GENOME} --vcf {input.vcf} \
                 --out-prefix {params.prefix} \
                 --include-indels --stochastic -rs {RAND_SEED} \
                 --block-size {POP_BLOCK_SIZE} --ld')
         elif POP_STOCHASTIC == 1:
             shell('{PYTHON} {DIR_SCRIPTS}/update_genome.py \
-                --ref {GENOME} --chrom {wildcards.CHROM} --vcf {input.vcf} \
+                --ref {GENOME} --vcf {input.vcf} \
                 --out-prefix {params.prefix} \
                 --include-indels --stochastic -rs {RAND_SEED} \
                 --block-size {POP_BLOCK_SIZE}')
         else:
             shell('{PYTHON} {DIR_SCRIPTS}/update_genome.py \
-                --ref {GENOME} --chrom {wildcards.CHROM} --vcf {input.vcf} \
+                --ref {GENOME} --vcf {input.vcf} \
                 --out-prefix {params.prefix} \
                 --include-indels')
 
-rule merge_pop_genome:
-    input:
-        expand(os.path.join(DIR_POP_GENOME_BLOCK,
-            POP_GENOME_SUFFIX + '.fa'),
-            CHROM = CHROM, GROUP = GROUP)
-    output:
-        os.path.join(DIR_POP_GENOME_BLOCK,
-            WG_POP_GENOME_SUFFIX + '.fa')
-    run:
-        list_fn = []
-        for fn in input:
-            print (fn)
-            print (wildcards.GROUP)
-            if fn.count(wildcards.GROUP) > 0:
-                list_fn.append(fn)
-        shell('cat {list_fn} >> {output}')
-
-rule aggregate_pop_vcf:
-    input:
-        vcf = expand(os.path.join(DIR_POP_GENOME_BLOCK,
-            POP_GENOME_SUFFIX + '.vcf'),
-            CHROM = CHROM, GROUP = GROUP)
-    output:
-        vcf = os.path.join(DIR_POP_GENOME_BLOCK,
-            WG_POP_GENOME_SUFFIX + '.vcf')
-    run:
-        list_fn = []
-        for fn in input:
-            print (fn)
-            print (wildcards.GROUP)
-            if fn.count(wildcards.GROUP) > 0:
-                list_fn.append(fn)
-        shell('{BCFTOOLS} concat -o {output.vcf} {list_fn}')
+# rule get_pop_sample:
+#     input:
+#         vcf_gz = os.path.join(DIR_POP_GENOME,
+#             'chr{CHROM}_superpop_{GROUP}.vcf.gz')
+#     output:
+#         vcf_header = os.path.join(DIR_POP_GENOME,
+#             'chr{CHROM}_superpop_{GROUP}.samples')
+#     shell:
+#         '{BCFTOOLS} view -h {input.vcf_gz} | tail -1 '
+#         '> {output.vcf_header}'
+# 
+# rule filter_pop_vcf:
+#     input:
+#         vcf_gz = os.path.join(DIR_POP_GENOME,
+#             'chr{CHROM}_superpop_{GROUP}.vcf.gz'),
+#         vcf_header = os.path.join(DIR_POP_GENOME,
+#             'chr{CHROM}_superpop_{GROUP}.samples')
+#     output:
+#         vcf = os.path.join(
+#             DIR_POP_GENOME,
+#             'chr{CHROM}_superpop_{GROUP}_t' + str(POP_THRSD) + '.vcf'
+#         )
+#     run:
+#         fn = list({input.vcf_header})[0]
+#         with open(fn, 'r') as f:
+#             for line in f:
+#                 n = len(line.split()) - 9
+#                 thrsd = int(n * 2 * float(POP_THRSD))
+#                 filt = 'AC > {}'.format(thrsd)
+#                 break
+#         shell('{BCFTOOLS} view -i "{filt}" \
+#             -v snps,indels {input.vcf_gz} > {output.vcf};')
+# 
+# rule build_pop_genome:
+#     input:
+#         vcf = os.path.join(
+#             DIR_POP_GENOME,
+#             'chr{CHROM}_superpop_{GROUP}_t' + str(POP_THRSD) + '.vcf'
+#         )
+#     output:
+#         os.path.join(
+#             DIR_POP_GENOME_BLOCK,
+#             POP_GENOME_SUFFIX + '.fa'
+#         ),
+#         os.path.join(
+#             DIR_POP_GENOME_BLOCK,
+#             POP_GENOME_SUFFIX + '.var'
+#         ),
+#         os.path.join(
+#             DIR_POP_GENOME_BLOCK,
+#             POP_GENOME_SUFFIX + '.vcf'
+#         )
+#     params:
+#         prefix = os.path.join(
+#             DIR_POP_GENOME_BLOCK,
+#             POP_GENOME_SUFFIX
+#         )
+#     run:
+#         if POP_STOCHASTIC == 1 and POP_USE_LD == 1:
+#             shell('{PYTHON} {DIR_SCRIPTS}/update_genome.py \
+#                 --ref {GENOME} --chrom {wildcards.CHROM} --vcf {input.vcf} \
+#                 --out-prefix {params.prefix} \
+#                 --include-indels --stochastic -rs {RAND_SEED} \
+#                 --block-size {POP_BLOCK_SIZE} --ld')
+#         elif POP_STOCHASTIC == 1:
+#             shell('{PYTHON} {DIR_SCRIPTS}/update_genome.py \
+#                 --ref {GENOME} --chrom {wildcards.CHROM} --vcf {input.vcf} \
+#                 --out-prefix {params.prefix} \
+#                 --include-indels --stochastic -rs {RAND_SEED} \
+#                 --block-size {POP_BLOCK_SIZE}')
+#         else:
+#             shell('{PYTHON} {DIR_SCRIPTS}/update_genome.py \
+#                 --ref {GENOME} --chrom {wildcards.CHROM} --vcf {input.vcf} \
+#                 --out-prefix {params.prefix} \
+#                 --include-indels')
+# 
+# rule merge_pop_genome:
+#     input:
+#         expand(os.path.join(DIR_POP_GENOME_BLOCK,
+#             POP_GENOME_SUFFIX + '.fa'),
+#             CHROM = CHROM, GROUP = GROUP)
+#     output:
+#         os.path.join(DIR_POP_GENOME_BLOCK,
+#             WG_POP_GENOME_SUFFIX + '.fa')
+#     run:
+#         list_fn = []
+#         for fn in input:
+#             print (fn)
+#             print (wildcards.GROUP)
+#             if fn.count(wildcards.GROUP) > 0:
+#                 list_fn.append(fn)
+#         shell('cat {list_fn} >> {output}')
+# 
+# rule aggregate_pop_vcf:
+#     input:
+#         vcf = expand(os.path.join(DIR_POP_GENOME_BLOCK,
+#             POP_GENOME_SUFFIX + '.vcf'),
+#             CHROM = CHROM, GROUP = GROUP)
+#     output:
+#         vcf = os.path.join(DIR_POP_GENOME_BLOCK,
+#             WG_POP_GENOME_SUFFIX + '.vcf')
+#     run:
+#         list_fn = []
+#         for fn in input:
+#             print (fn)
+#             print (wildcards.GROUP)
+#             if fn.count(wildcards.GROUP) > 0:
+#                 list_fn.append(fn)
+#         shell('{BCFTOOLS} concat -o {output.vcf} {list_fn}')
 
 rule build_pop_genome_index:
     input:
@@ -169,28 +248,28 @@ Rules for building indexes for liftover.
 '''
 rule liftover_serialize_major:
     input:
-        vcf_major = os.path.join(DIR, 'major/wg-maj.vcf'),
+        vcf_major = os.path.join(DIR, 'major/' + EXP_LABEL + '-maj.vcf'),
         length_map = LENGTH_MAP
     output:
-        lft = os.path.join(DIR_MAJOR, 'wg-major.lft')
+        lft = os.path.join(DIR_MAJOR, EXP_LABEL + '-major.lft')
     params:
-        os.path.join(DIR_MAJOR, 'wg-major')
+        os.path.join(DIR_MAJOR, EXP_LABEL + '-major')
     shell:
         '{LIFTOVER} serialize -v {input.vcf_major} -p {params} -k {input.length_map}'
 
 rule liftover_serialize_pop_genome:
     input:
         vcf = os.path.join(DIR_POP_GENOME, POP_DIRNAME + '/' +
-            'wg-superpop_{GROUP}_' + POP_DIRNAME  + '.vcf'),
+            EXP_LABEL + '-superpop_{GROUP}_' + POP_DIRNAME  + '.vcf'),
         length_map = LENGTH_MAP
     output:
         lft = os.path.join(
             DIR_POP_GENOME, POP_DIRNAME + '/' +
-            'wg-superpop_{GROUP}_' + POP_DIRNAME + '.lft')
+            EXP_LABEL + '-superpop_{GROUP}_' + POP_DIRNAME + '.lft')
     params:
         os.path.join(
             DIR_POP_GENOME, POP_DIRNAME + '/' +
-            'wg-superpop_{GROUP}_' + POP_DIRNAME)
+            EXP_LABEL + '-superpop_{GROUP}_' + POP_DIRNAME)
     run:
         shell('{LIFTOVER} serialize -v {input.vcf} -p {params} -k {input.length_map}')
 
