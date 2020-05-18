@@ -37,24 +37,38 @@
 #     shell:
 #         '{BCFTOOLS} concat -o {output.vcf} {input.vcf}'
 
+# rule build_major:
+#     input:
+#         vcf = os.path.join(DIR, EXP_LABEL + '_filtered.vcf')
+#     output:
+#         vcf_major = os.path.join(DIR, 'major/' + EXP_LABEL + '-maj-bcftools.vcf'),
+#         out_genome = os.path.join(DIR, 'major/' + EXP_LABEL + '-maj.fa'),
+#         out_var = os.path.join(DIR, 'major/' + EXP_LABEL + '-maj.var'),
+#         out_vcf = os.path.join(DIR, 'major/' + EXP_LABEL + '-maj.vcf')
+#     params:
+#         out_prefix = os.path.join(DIR, 'major/' + EXP_LABEL + '-maj')
+#     shell:
+#         '{BCFTOOLS} view -O v -q 0.5 {input.vcf} -e \'AF = 0.5\' -v snps,indels -m2 -M2 > '
+#         '{output.vcf_major};'
+#         '{PYTHON} {DIR_SCRIPTS}/update_genome.py '
+#         '   --ref {GENOME} --vcf {output.vcf_major} '
+#         '   --out-prefix {params.out_prefix} '
+#         '   --include-indels'
+
 rule build_major:
     input:
-        vcf = os.path.join(DIR, EXP_LABEL + '_filtered.vcf')
+        vcf = os.path.join(DIR, EXP_LABEL + '_filtered.vcf'),
+        genome = GENOME
     output:
-        vcf_major = os.path.join(DIR, 'major/' + EXP_LABEL + '-maj-bcftools.vcf'),
+        vcf = os.path.join(DIR, 'major/' + EXP_LABEL + '-maj.vcf'),
+        vcfgz = os.path.join(DIR, 'major/' + EXP_LABEL + '-maj.vcf.gz'),
+        vcfgz_idx = os.path.join(DIR, 'major/' + EXP_LABEL + '-maj.vcf.gz.csi'),
         out_genome = os.path.join(DIR, 'major/' + EXP_LABEL + '-maj.fa'),
-        out_var = os.path.join(DIR, 'major/' + EXP_LABEL + '-maj.var'),
-        out_vcf = os.path.join(DIR, 'major/' + EXP_LABEL + '-maj.vcf')
-    params:
-        out_prefix = os.path.join(DIR, 'major/' + EXP_LABEL + '-maj')
     shell:
-        '{BCFTOOLS} view -O v -q 0.5 {input.vcf} -e \'AF = 0.5\' -v snps,indels -m2 -M2 > '
-        '{output.vcf_major};'
-        '{PYTHON} {DIR_SCRIPTS}/update_genome.py '
-        '   --ref {GENOME} --vcf {output.vcf_major} '
-        '   --out-prefix {params.out_prefix} '
-        '   --include-indels'
-
+        '{BCFTOOLS} view -O v -q 0.5000001 -G -o {output.vcf} -v snps,indels -m2 -M2 {input.vcf};'
+        'bgzip -c {output.vcf} > {output.vcfgz};'
+        '{BCFTOOLS} index {output.vcfgz};'
+        '{BCFTOOLS} consensus -f {input.genome} -o {output.out_genome} {output.vcfgz}'
 
 rule build_major_index:
     input:
