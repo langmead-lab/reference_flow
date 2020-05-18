@@ -547,11 +547,6 @@ if __name__ == '__main__':
     parser.add_argument(
         '-v', '--vcf', type=str, help="Path to VCF file containing mutation information"
     )
-    # I'd like to deprecate this
-    parser.add_argument(
-        '-c', '--chrom', type=str, help="Chromosome to process (deprecated)"
-        # '-c', '--chrom', type=str, required=True, help="Chromosome to process"
-    )
     parser.add_argument(
         '-op', '--out-prefix', type=str, required=True, help="Path to output prefix"
     )
@@ -583,7 +578,7 @@ if __name__ == '__main__':
         '-d', '--data-source', type=str, default='1kg', help="Source of population genomic data, currently support '1kg' and 'gnomad' ['1kg']"
     )
     parser.add_argument(
-        '--gnomad-ac-field', type=str, default='AF',
+        '--gnomad-ac-field', type=str, default='AC',
         help="GnomAD allele count field; activated only in stochastic mode; \
             can be changed depending on popultion of interest ['AC']"
     )
