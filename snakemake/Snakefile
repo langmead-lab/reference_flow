@@ -1,7 +1,8 @@
 import os
 import pandas as pd
 
-configfile: "config_local.yaml"
+configfile: 'test.yaml'
+# configfile: "config_local.yaml"
 # configfile: "config.yaml"
 # configfile: "config_mouse.yaml"
 
