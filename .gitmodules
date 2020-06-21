@@ -1,5 +1,5 @@
 [submodule "liftover"]
-	path = liftover
+	path = levioSAM
 	url = git@github.com:alshai/liftover.git
 [submodule "befdb01428badb779ba74b672d138e88eecbcd86 liftover (heads/master)"]
 	branch = dev
