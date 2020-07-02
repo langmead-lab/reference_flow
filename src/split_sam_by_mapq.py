@@ -205,6 +205,7 @@ def process_paired_end_data(f_in, fhigh_out, flow_out, fastq_prefix, mapq_thresh
         flow_fq1_out = open(fastq_prefix + '_1.fq', 'w')
         flow_fq2_out = open(fastq_prefix + '_2.fq', 'w')
 
+    # Runs in parallel, but this will not be faster.
     # rw_lock = ReadWriteLock()
     # threads = []
     # for i in range(4):
