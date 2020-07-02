@@ -13,7 +13,7 @@ rule align_to_major:
         sam = os.path.join(DIR_FIRST_PASS, EXP_LABEL + '-major.sam')
     threads: THREADS
     shell:
-        'bowtie2 --threads {THREADS} -x {params.index} -U {input.reads1} -S {output.sam}'
+        'bowtie2 --threads {THREADS} -x {params.index} -1 {input.reads1} -2 {input.reads2} -S {output.sam}'
 
 ''' Split first-pass alignment into high-quality and low-quality files. '''
 rule refflow_split_aln_by_mapq:
