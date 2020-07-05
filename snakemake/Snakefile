@@ -1,7 +1,8 @@
 import os
 import pandas as pd
 
-configfile: 'local_test.yaml'
+configfile: 'test_pe.yaml'
+# configfile: 'test_se.yaml'
 # configfile: "config_local.yaml"
 # configfile: "config.yaml"
 # configfile: "config_mouse.yaml"
@@ -126,9 +127,9 @@ rule aggregate_vcf:
     input:
         vcf = expand(os.path.join(DIR, '{CHROM}_filtered.vcf'), CHROM = CHROM)
     output:
-        vcf = os.path.join(DIR, EXP_LABEL + '_filtered.vcf')
+        vcf = os.path.join(DIR, EXP_LABEL + '_filtered.vcf.gz')
     shell:
-        '{BCFTOOLS} concat -o {output.vcf} {input.vcf}'
+        '{BCFTOOLS} concat -O z -o {output.vcf} {input.vcf}'
 
 # rule prepare_chrom_genome:
 #     input:

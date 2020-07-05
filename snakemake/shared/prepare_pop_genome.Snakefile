@@ -17,7 +17,7 @@ rule build_pop_vcf:
     Each output VCF includes only indivs in the specified population group.
     '''
     input:
-        vcf = os.path.join(DIR, EXP_LABEL + '_filtered.vcf'),
+        vcf = os.path.join(DIR, EXP_LABEL + '_filtered.vcf.gz'),
         indiv_group = os.path.join(DIR, '1KG_indivs/sample_superpop_{GROUP}.txt')
     output:
         vcf_gz = os.path.join(DIR_POP_GENOME, EXP_LABEL + '_superpop_{GROUP}.vcf.gz')
