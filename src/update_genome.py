@@ -365,6 +365,7 @@ def update_genome(
             offsetA = 0
             offsetB = 0
             chrom = row[0]
+            current_block_pos = 0
         loc = int(row[1])
 
         #: filter based on gnomad_af_th if it is set (gnomad only)
@@ -509,7 +510,7 @@ def read_genome(fn_genome):
             value: [full contig name (string), sequence (list)]
                 sequence is represented in lists for easier modification later
     '''
-    if not (sys.version_info.major == 3 and sys.version_info.minor >= 6):
+    if not (sys.version_info.major == 3 and sys.version_info.minor < 6):
         # Use OrderedDict to maintain dictionary oder as input
         dict_genome = OrderedDict()
     else:
@@ -537,7 +538,6 @@ def read_genome(fn_genome):
     return dict_genome
 
 if __name__ == '__main__':
-
     # Print file's docstring if -h is invoked
     parser = argparse.ArgumentParser(description=__doc__,
             formatter_class=argparse.RawDescriptionHelpFormatter)
