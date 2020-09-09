@@ -3,11 +3,13 @@ rule build_major:
         vcf = os.path.join(DIR, EXP_LABEL + '_filtered.vcf.gz'),
         genome = GENOME
     output:
+        vcf = os.path.join(DIR, 'major/' + EXP_LABEL + '-maj.vcf'),
         vcfgz = os.path.join(DIR, 'major/' + EXP_LABEL + '-maj.vcf.gz'),
         vcfgz_idx = os.path.join(DIR, 'major/' + EXP_LABEL + '-maj.vcf.gz.csi'),
         out_genome = os.path.join(DIR, 'major/' + EXP_LABEL + '-maj.fa'),
     shell:
-        '{BCFTOOLS} view -O z -q 0.5000001 -G -o {output.vcfgz} -v snps,indels -m2 -M2 {input.vcf};'
+        '{BCFTOOLS} view -O z -q 0.5000001 -G -o {output.vcf} -v snps,indels -m2 -M2 {input.vcf};'
+        'bgzip -c {output.vcf} > {output.vcfgz};'
         '{BCFTOOLS} index {output.vcfgz};'
         '{BCFTOOLS} consensus -f {input.genome} -o {output.out_genome} {output.vcfgz}'
 

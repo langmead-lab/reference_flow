@@ -36,7 +36,7 @@ rule refflow_split_aln_by_mapq:
         'samtools fastq {output.lowq} > {output.lowq_reads}'
 
 ''' Align low-quality reads using population genomes.'''
-rule refflow_align_secondpass_paired_end:
+rule refflow_align_secondpass_single_end:
     input:
         reads1 = os.path.join(DIR_FIRST_PASS,
             EXP_LABEL + '-major-mapqlt' + ALN_MAPQ_THRSD + '_1.fq'),
