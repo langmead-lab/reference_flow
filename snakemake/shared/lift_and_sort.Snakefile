@@ -25,7 +25,7 @@ rule lift_refflow_secondpass_and_merge:
             EXP_LABEL + '-major-{}-{}.merge_paths'.format(ALN_MAPQ_THRSD, POP_DIRNAME)),
         lft_pop = expand(os.path.join(
             DIR_POP_GENOME, POP_DIRNAME + '/' +
-            EXP_LABEL + '-superpop_{GROUP}_' + POP_DIRNAME + '.lft'),
+            EXP_LABEL + '-' + POP_LEVEL + '_{GROUP}_' + POP_DIRNAME + '.lft'),
             GROUP = GROUP),
         lft_maj = os.path.join(DIR_MAJOR, EXP_LABEL + '-major.lft'),
     output:

@@ -4,7 +4,7 @@ Rules for building population genomes
 rule prepare_pop_indiv:
     output:
         expand(
-            os.path.join(DIR, '1KG_indivs/sample_superpop_{GROUP}.txt'), GROUP = GROUP)
+            os.path.join(DIR, '1KG_indivs/sample_' + POP_LEVEL + '_{GROUP}.txt'), GROUP = GROUP)
     params:
         prefix = os.path.join(DIR, '1KG_indivs/sample')
     shell:
@@ -18,9 +18,9 @@ rule build_pop_vcf:
     '''
     input:
         vcf = os.path.join(DIR, EXP_LABEL + '_filtered.vcf.gz'),
-        indiv_group = os.path.join(DIR, '1KG_indivs/sample_superpop_{GROUP}.txt')
+        indiv_group = os.path.join(DIR, '1KG_indivs/sample_' + POP_LEVEL + '_{GROUP}.txt')
     output:
-        vcf_gz = os.path.join(DIR_POP_GENOME, EXP_LABEL + '_superpop_{GROUP}.vcf.gz')
+        vcf_gz = os.path.join(DIR_POP_GENOME, EXP_LABEL + '_' + POP_LEVEL + '_{GROUP}.vcf.gz')
     shell:
         '{BCFTOOLS} view -S {input.indiv_group} '
         '--force-samples {input.vcf} -V mnps,other -m2 -M2 | bgzip > {output.vcf_gz}'
@@ -28,10 +28,10 @@ rule build_pop_vcf:
 rule get_pop_sample:
     input:
         vcf_gz = os.path.join(DIR_POP_GENOME,
-            EXP_LABEL + '_superpop_{GROUP}.vcf.gz')
+            EXP_LABEL + '_' + POP_LEVEL + '_{GROUP}.vcf.gz')
     output:
         vcf_header = os.path.join(DIR_POP_GENOME,
-            EXP_LABEL + '_superpop_{GROUP}.samples')
+            EXP_LABEL + '_' + POP_LEVEL + '_{GROUP}.samples')
     shell:
         '{BCFTOOLS} view -h {input.vcf_gz} | tail -1 '
         '> {output.vcf_header}'
@@ -39,13 +39,13 @@ rule get_pop_sample:
 rule filter_pop_vcf:
     input:
         vcf_gz = os.path.join(DIR_POP_GENOME,
-            EXP_LABEL + '_superpop_{GROUP}.vcf.gz'),
+            EXP_LABEL + '_' + POP_LEVEL + '_{GROUP}.vcf.gz'),
         vcf_header = os.path.join(DIR_POP_GENOME,
-            EXP_LABEL + '_superpop_{GROUP}.samples')
+            EXP_LABEL + '_' + POP_LEVEL + '_{GROUP}.samples')
     output:
         vcf = os.path.join(
             DIR_POP_GENOME,
-            EXP_LABEL + '_superpop_{GROUP}_t' + str(POP_THRSD) + '.vcf'
+            EXP_LABEL + '_' + POP_LEVEL + '_{GROUP}_t' + str(POP_THRSD) + '.vcf'
         )
     run:
         fn = list({input.vcf_header})[0]
@@ -62,7 +62,7 @@ rule build_pop_genome:
     input:
         vcf = os.path.join(
             DIR_POP_GENOME,
-            EXP_LABEL + '_superpop_{GROUP}_t' + str(POP_THRSD) + '.vcf'
+            EXP_LABEL + '_' + POP_LEVEL + '_{GROUP}_t' + str(POP_THRSD) + '.vcf'
         )
     output:
         os.path.join(
@@ -121,7 +121,7 @@ rule check_pop_genome:
     input:
         expand(
             DIR_POP_GENOME_BLOCK_IDX + WG_POP_GENOME_SUFFIX + '.{IDX_ITEMS}.bt2',
-            GROUP = GROUP, IDX_ITEMS = IDX_ITEMS
+            GROUP=GROUP, IDX_ITEMS=IDX_ITEMS, POP_LEVEL=POP_LEVEL
         )
     output:
         touch(temp(os.path.join(DIR, 'prepare_pop_genome.done')))
@@ -144,16 +144,16 @@ rule leviosam_serialize_major:
 rule leviosam_serialize_pop_genome:
     input:
         vcf = os.path.join(DIR_POP_GENOME, POP_DIRNAME + '/' +
-            EXP_LABEL + '-superpop_{GROUP}_' + POP_DIRNAME  + '.vcf'),
+            EXP_LABEL + '-' + POP_LEVEL + '_{GROUP}_' + POP_DIRNAME  + '.vcf'),
         length_map = LENGTH_MAP
     output:
         lft = os.path.join(
             DIR_POP_GENOME, POP_DIRNAME + '/' +
-            EXP_LABEL + '-superpop_{GROUP}_' + POP_DIRNAME + '.lft')
+            EXP_LABEL + '-' + POP_LEVEL +'_{GROUP}_' + POP_DIRNAME + '.lft')
     params:
         os.path.join(
             DIR_POP_GENOME, POP_DIRNAME + '/' +
-            EXP_LABEL + '-superpop_{GROUP}_' + POP_DIRNAME)
+            EXP_LABEL + '-' + POP_LEVEL +'_{GROUP}_' + POP_DIRNAME)
     run:
         shell('{LEVIOSAM} serialize -v {input.vcf} -p {params} -k {input.length_map}')
 

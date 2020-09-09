@@ -16,6 +16,7 @@ assert ALN_MODE in ['single-end', 'paired-end']
 READS1 = config['READS1']
 READS2 = config['READS2']
 GROUP = config['GROUP']
+POP_LEVEL = config['POP_LEVEL']
 ALN_MAPQ_THRSD = config['ALN_MAPQ_THRSD']
 POP_THRSD = config['POP_THRSD']
 POP_STOCHASTIC = config['POP_STOCHASTIC']
@@ -60,7 +61,7 @@ DIR_MAJOR = os.path.join(DIR, 'major')
 # Prefixes and directory paths for population reference contruction and indexing
 DIR_POP_GENOME = os.path.join(DIR, 'pop_genome/')
 POP_DIRNAME = 'thrds{0}_S{1}_b{2}_ld{3}'.format(POP_THRSD, POP_STOCHASTIC, POP_BLOCK_SIZE, POP_USE_LD)
-WG_POP_GENOME_SUFFIX = EXP_LABEL + '-superpop_{GROUP}_' + POP_DIRNAME
+WG_POP_GENOME_SUFFIX = EXP_LABEL + '-{POP_LEVEL}_{GROUP}_' + POP_DIRNAME
 DIR_POP_GENOME_BLOCK = os.path.join(DIR_POP_GENOME, POP_DIRNAME + '/')
 DIR_POP_GENOME_BLOCK_IDX = os.path.join(DIR_POP_GENOME_BLOCK, 'indexes/')
 
