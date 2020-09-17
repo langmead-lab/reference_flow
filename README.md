@@ -27,11 +27,11 @@ Other installation approaches are also provided in the [Snakemake installation p
 sh src/download_1kg_pop_table.sh
 ```
 
-### Liftover
+### LevioSAM
 
-Liftover is used to perform coordinate system mappign between population reference genomes and a standard reference genome such as GRCh38. 
-The liftover software tracks the "edits" between a pair of genomes using a VCF file.
-Please refer to the [liftover github page](https://github.com/alshai/liftover) to install the software.
+LevioSAM is used to perform coordinate system mappign between population reference genomes and a standard reference genome such as GRCh38. 
+The levioSAM software tracks the "edits" between a pair of genomes using a VCF file.
+Please refer to the [levioSAM github page](https://github.com/alshai/levioSAM) to install the software.
 
 
 ## Running reference flow with pre-built indexes
