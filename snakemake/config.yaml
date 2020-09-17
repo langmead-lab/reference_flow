@@ -75,7 +75,7 @@ CHROM_MAP : '../resources/GRCh38.chrom_map'
 # Paths of software
 BCFTOOLS : 'bcftools' # there is a bug with `bcftools consensus` in v1.9, so we recommend using the latest dev version
 SAMTOOLS : 'samtools'
-LIFTOVER : '../liftover/liftover'
+LEVIOSAM : '../levioSAM/leviosam'
 PYTHON : 'python'
 DIR_SCRIPTS : '../src'
 

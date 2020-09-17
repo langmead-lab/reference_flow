@@ -2,34 +2,40 @@
 The rules in this file performs coordinate system transformation for aligned reads
 and sort the reads.
 '''
-rule liftover_lift_major_highq:
+rule lift_major_highq:
     input:
-        sam = os.path.join(DIR_FIRST_PASS, 'wg-major-mapqgeq{}.sam'.format(ALN_MAPQ_THRSD)),
-        lft = os.path.join(DIR_MAJOR, 'wg-major.lft')
+        sam = os.path.join(DIR_FIRST_PASS, EXP_LABEL + '-major-mapqgeq{}.sam'.format(ALN_MAPQ_THRSD)),
+        lft = os.path.join(DIR_MAJOR, EXP_LABEL + '-major.lft')
     output:
-        os.path.join(DIR_FIRST_PASS, 'wg-major-mapqgeq{}-liftover.sam'.format(ALN_MAPQ_THRSD))
+        os.path.join(DIR_FIRST_PASS, EXP_LABEL + '-major-mapqgeq{}-liftover.sam'.format(ALN_MAPQ_THRSD))
     params:
-        os.path.join(DIR_FIRST_PASS, 'wg-major-mapqgeq{}-liftover'.format(ALN_MAPQ_THRSD))
+        os.path.join(DIR_FIRST_PASS, EXP_LABEL + '-major-mapqgeq{}-liftover'.format(ALN_MAPQ_THRSD))
+    threads: THREADS
     run:
-        shell('{LIFTOVER} lift -a {input.sam} -l {input.lft} -p {params}')
+        shell('{LEVIOSAM} lift -a {input.sam} -l {input.lft} -p {params} -t {threads}')
 
 #: Refflow -- second pass
-rule liftover_lift_refflow_secondpass_and_merge:
+rule lift_refflow_secondpass_and_merge:
     input:
-        maj_fp = os.path.join(DIR_FIRST_PASS, 'wg-major-mapqgeq{}-liftover.sam'.format(ALN_MAPQ_THRSD)),
-        second_sam_path = os.path.join(DIR_SECOND_PASS, 'wg-major-{}-{}.merge_paths'.format(ALN_MAPQ_THRSD, POP_DIRNAME)),
+        maj_fp = os.path.join(
+            DIR_FIRST_PASS,
+            EXP_LABEL + '-major-mapqgeq{}-liftover.sam'.format(ALN_MAPQ_THRSD)),
+        second_sam_path = os.path.join(
+            DIR_SECOND_PASS,
+            EXP_LABEL + '-major-{}-{}.merge_paths'.format(ALN_MAPQ_THRSD, POP_DIRNAME)),
         lft_pop = expand(os.path.join(
             DIR_POP_GENOME, POP_DIRNAME + '/' +
-            'wg-superpop_{GROUP}_' + POP_DIRNAME + '.lft'),
+            EXP_LABEL + '-' + POP_LEVEL + '_{GROUP}_' + POP_DIRNAME + '.lft'),
             GROUP = GROUP),
-        lft_maj = os.path.join(DIR_MAJOR, 'wg-major.lft'),
+        lft_maj = os.path.join(DIR_MAJOR, EXP_LABEL + '-major.lft'),
     output:
         lfted_refflow_sam = os.path.join(DIR_SECOND_PASS,
-            'wg-refflow-{}-{}-liftover.sam'.format(ALN_MAPQ_THRSD, POP_DIRNAME)),
+            EXP_LABEL + '-refflow-{}-{}-liftover.sam'.format(ALN_MAPQ_THRSD, POP_DIRNAME)),
         lfted_major_second_sam = os.path.join(DIR_SECOND_PASS, '2ndpass-maj-liftover.sam'),
         lfted_group_second_sam = [
             os.path.join(DIR_SECOND_PASS, '2ndpass-') + 
             g + '-liftover.sam' for g in GROUP]
+    threads: THREADS
     run:
         list_sam = []
         list_group = []
@@ -44,18 +50,18 @@ rule liftover_lift_refflow_secondpass_and_merge:
                 list_group.append(split_bn[0].split('-')[-1])
         for i, s in enumerate(list_sam):
             sys.stderr.write('sam={}, group = {}\n'.format(s, list_group[i]))
-        
-        #: copy lifted first pass sam 
+
+        # Copy lifted first pass sam.
         shell('cp {input.maj_fp} {output.lfted_refflow_sam};')
-        for i in range(len(list_sam)):
-            sam = list_sam[i]
+        # Run levioSAM and merge files.
+        for i, sam in enumerate(list_sam):
             prefix = os.path.join(DIR,
                 'experiments/' + wildcards.INDIV + '/' + POP_DIRNAME + 
                 '/2ndpass-{}-liftover'.format(list_group[i]))
             if list_group[i] == 'maj':
                 sys.stderr.write('sam={}, lft = {}\n'.format(sam, input.lft_maj))
-                shell('{LIFTOVER} lift -a {sam} -l {input.lft_maj} -p {prefix};')
-                #: append reads to all-in-one lifted SAM
+                shell('{LEVIOSAM} lift -a {sam} -l {input.lft_maj} -p {prefix} -t {threads};')
+                # Append reads to all-in-one lifted SAM.
                 shell('grep -hv "^@" {prefix}.sam >> {output.lfted_refflow_sam};')
             elif list_group[i] in GROUP:
                 for lft in input.lft_pop:
@@ -63,17 +69,17 @@ rule liftover_lift_refflow_secondpass_and_merge:
                     if lft.count(list_group[i]) > 0:
                         break
                 sys.stderr.write('sam={}, lft = {}\n'.format(sam, lft))
-                shell('{LIFTOVER} lift -a {sam} -l {lft} -p {prefix};')
-                #: append reads to all-in-one lifted SAM
+                shell('{LEVIOSAM} lift -a {sam} -l {lft} -p {prefix} -t {threads};')
+                # Append reads to all-in-one lifted SAM.
                 shell('grep -hv "^@" {prefix}.sam >> {output.lfted_refflow_sam};')
 
-rule check_elevate:
+rule check_leviosam:
     input:
         expand(os.path.join(DIR_SECOND_PASS,
-            'wg-refflow-{}-{}-liftover.sam'.format(ALN_MAPQ_THRSD, POP_DIRNAME)),
+            EXP_LABEL + '-refflow-{}-{}-liftover.sam'.format(ALN_MAPQ_THRSD, POP_DIRNAME)),
         INDIV = INDIV)
     output:
-        touch(temp(os.path.join(DIR, 'elevate.done')))
+        touch(temp(os.path.join(DIR, 'leviosam.done')))
 
 '''
 Sort SAM records
@@ -81,18 +87,19 @@ Sort SAM records
 rule sort_refflow:
     input:
         os.path.join(DIR_SECOND_PASS,
-            'wg-refflow-{}-{}-liftover.sam'.format(ALN_MAPQ_THRSD, POP_DIRNAME))
+            EXP_LABEL + '-refflow-{}-{}-liftover.sam'.format(ALN_MAPQ_THRSD, POP_DIRNAME))
     output:
         os.path.join(DIR_SECOND_PASS,
-            'wg-refflow-{}-{}-liftover-sorted.bam'.format(ALN_MAPQ_THRSD, POP_DIRNAME))
+            EXP_LABEL + '-refflow-{}-{}-liftover-sorted.bam'.format(ALN_MAPQ_THRSD, POP_DIRNAME))
     threads: 4
     run:
-        shell('samtools sort -@ {threads} -o {output} -O BAM {input};')
+        shell('{SAMTOOLS} sort -@ {threads} -o {output} -O BAM {input};')
 
 rule check_sort:
     input:
         expand(os.path.join(DIR_SECOND_PASS,
-            'wg-refflow-{}-{}-liftover-sorted.bam'.format(ALN_MAPQ_THRSD, POP_DIRNAME)), INDIV = INDIV),
+            EXP_LABEL + '-refflow-{}-{}-liftover-sorted.bam'.format(
+                ALN_MAPQ_THRSD, POP_DIRNAME)), INDIV = INDIV),
     output:
         touch(temp(os.path.join(DIR, 'sort.done')))
 

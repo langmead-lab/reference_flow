@@ -1,14 +1,22 @@
 import os
 import pandas as pd
 
-configfile: "config.yaml"
+configfile: 'test_pe.yaml'
+# configfile: 'test_se.yaml'
+# configfile: "config_local.yaml"
+# configfile: "config.yaml"
 # configfile: "config_mouse.yaml"
 
 ''' Load from config '''
 CHROM = config['CHROM']
 INDIV = config['INDIV']
+EXP_LABEL = config['EXP_LABEL']
+ALN_MODE = config['ALN_MODE']
+assert ALN_MODE in ['single-end', 'paired-end']
 READS1 = config['READS1']
+READS2 = config['READS2']
 GROUP = config['GROUP']
+POP_LEVEL = config['POP_LEVEL']
 ALN_MAPQ_THRSD = config['ALN_MAPQ_THRSD']
 POP_THRSD = config['POP_THRSD']
 POP_STOCHASTIC = config['POP_STOCHASTIC']
@@ -31,7 +39,7 @@ FAMILY = config['FAMILY']
 SPOP = config['SPOP']
 BCFTOOLS = config['BCFTOOLS']
 SAMTOOLS = config['SAMTOOLS']
-LIFTOVER = config['LIFTOVER']
+LEVIOSAM = config['LEVIOSAM']
 PYTHON = config['PYTHON']
 DIR_SCRIPTS = config['DIR_SCRIPTS']
 
@@ -40,7 +48,7 @@ RAND_SEED = config['RAND_SEED']
 ''''''
 
 # Prefixes for filtered VCFs
-PREFIX_VCF_F = os.path.join(DIR, '{CHROM}_filtered')
+# PREFIX_VCF_F = os.path.join(DIR, '{CHROM}_filtered')
 
 # Bowtie 2 index extensions
 IDX_ITEMS = ['1', '2', '3', '4', 'rev.1', 'rev.2']
@@ -53,28 +61,21 @@ DIR_MAJOR = os.path.join(DIR, 'major')
 # Prefixes and directory paths for population reference contruction and indexing
 DIR_POP_GENOME = os.path.join(DIR, 'pop_genome/')
 POP_DIRNAME = 'thrds{0}_S{1}_b{2}_ld{3}'.format(POP_THRSD, POP_STOCHASTIC, POP_BLOCK_SIZE, POP_USE_LD)
-POP_GENOME_SUFFIX = \
-    'chr{CHROM}-superpop_{GROUP}_thrds' + str(POP_THRSD) + \
-    '_S' + str(POP_STOCHASTIC) + '_b' + str(POP_BLOCK_SIZE) + \
-    '_ld' + str(POP_USE_LD)
-WG_POP_GENOME_SUFFIX = \
-    'wg-superpop_{GROUP}_thrds' + str(POP_THRSD) + \
-    '_S' + str(POP_STOCHASTIC) + '_b' + str(POP_BLOCK_SIZE) + \
-    '_ld' + str(POP_USE_LD)
+WG_POP_GENOME_SUFFIX = EXP_LABEL + '-{POP_LEVEL}_{GROUP}_' + POP_DIRNAME
 DIR_POP_GENOME_BLOCK = os.path.join(DIR_POP_GENOME, POP_DIRNAME + '/')
 DIR_POP_GENOME_BLOCK_IDX = os.path.join(DIR_POP_GENOME_BLOCK, 'indexes/')
 
 # Prefix and directory paths for experiments
 DIR_FIRST_PASS = os.path.join(DIR, 'experiments/{INDIV}/')
 DIR_SECOND_PASS = os.path.join(DIR, 'experiments/{INDIV}/' + POP_DIRNAME)
-PREFIX_SECOND_PASS = os.path.join(DIR_SECOND_PASS, 'wg-major-' + ALN_MAPQ_THRSD + '-{GROUP}-' + POP_DIRNAME)
+PREFIX_SECOND_PASS = os.path.join(DIR_SECOND_PASS, EXP_LABEL + '-major-' + ALN_MAPQ_THRSD + '-{GROUP}-' + POP_DIRNAME)
 
 # Bias results directory
 DIR_RESULTS_BIAS = os.path.join(DIR, 'results/bias')
 
 ''' Snakemake modules '''
 # Functions
-include: '../snakemake/shared/functions.Snakefile'
+include: 'shared/functions.Snakefile'
 
 if not USE_PREBUILT:
     # Prepare pop genome and indexes
@@ -85,57 +86,56 @@ if not USE_PREBUILT:
     #      check: 'prepare_standard_genome.done'
     include: 'shared/prepare_standard_genome.Snakefile'
 
-# Align reads to grch major, reference flow, personalized genomes
+# Align reads.
 #      check: 'alignment_refflow.done'
-include: 'shared/alignment.Snakefile'
+# include: 'shared/alignment.Snakefile'
+if ALN_MODE == 'single-end':
+    include: 'shared/alignment_single_end.Snakefile'
+elif ALN_MODE == 'paired-end':
+    include: 'shared/alignment_paired_end.Snakefile'
 
-# Elevate and sort reads
-#      check: 'elevate.done', 'sort.done'
-include: 'shared/elevate_and_sort.Snakefile'
+# Lift and sort reads
+#      check: 'leviosam.done', 'sort.done'
+include: 'shared/lift_and_sort.Snakefile'
 
-TODO_LIST = ['alignment_refflow.done', 'elevate.done']
+TODO_LIST = ['alignment_refflow.done', 'leviosam.done']
 if not USE_PREBUILT:
     TODO_LIST.append('prepare_pop_genome.done')
     TODO_LIST.append('prepare_standard_genome.done')
 if SORT_SAM:
-    TODO_LIST.append('sorting.done')
+    TODO_LIST.append('sort.done')
 
 ''' Snakemake rules '''
 rule all:
     input:
         expand(os.path.join(DIR, '{task}'), task = TODO_LIST)
-        #   # Building genomes
-        #   pop_genome = os.path.join(DIR, 'prepare_pop_genome.done'),
-        #   standard_genome = os.path.join(DIR, 'prepare_standard_genome.done'),
-        #   # Align reads with reference flow
-        #   align_refflow = os.path.join(DIR, 'alignment_refflow.done'),
-        #   # Elevate alignments to standard reference genome coordinates
-        #   elevate = os.path.join(DIR, 'elevate.done'),
-        #   # Sort SAMs
-        #   sorting = os.path.join(DIR, 'sort.done'),
 
 rule filter_vcf:
     input:
         vcf = os.path.join(DIR_VCF, VCF_PREFIX + '{CHROM}' + VCF_SUFFIX),
         chrom_map = CHROM_MAP
     output:
-        vcf = PREFIX_VCF_F + '.vcf'
+        # vcf = PREFIX_VCF_F + '.vcf'
+        vcf = temp(os.path.join(DIR, '{CHROM}_filtered.vcf'))
     shell:
-        '{BCFTOOLS} view -r {wildcards.CHROM} -c 1 -f PASS -V mnps,other {input.vcf} | {BCFTOOLS} annotate --rename-chrs {input.chrom_map} -o {output.vcf}'
-        # '{BCFTOOLS} view -c 1 -f PASS -V mnps,other {input.vcf} | {BCFTOOLS} annotate --rename-chrs {input.chrom_map} -o {output.vcf}'
+        # Take PASS variants
+        # Does not remove mnps, since they will be needed for constructing personalized reference genome, 
+        # and will be removed when building major and refflow references.
+        '{BCFTOOLS} view -r {wildcards.CHROM} -c 1 -f PASS {input.vcf} | {BCFTOOLS} annotate --rename-chrs {input.chrom_map} -o {output.vcf}'
+        # '{BCFTOOLS} view -r {wildcards.CHROM} -c 1 -f PASS -V mnps,other {input.vcf} | {BCFTOOLS} annotate --rename-chrs {input.chrom_map} -o {output.vcf}'
 
 rule aggregate_vcf:
     input:
         vcf = expand(os.path.join(DIR, '{CHROM}_filtered.vcf'), CHROM = CHROM)
     output:
-        vcf = os.path.join(DIR, 'wg_filtered.vcf')
+        vcf = os.path.join(DIR, EXP_LABEL + '_filtered.vcf.gz')
     shell:
-        '{BCFTOOLS} concat -o {output.vcf} {input.vcf}'
+        '{BCFTOOLS} concat -O z -o {output.vcf} {input.vcf}'
 
-rule prepare_chrom_genome:
-    input:
-        genome = GENOME
-    output:
-        os.path.join(DIR, 'chr{CHROM}.fa')
-    shell:
-        '{SAMTOOLS} faidx {input.genome} {CHR_PREFIX}{wildcards.CHROM} > {output};'
+# rule prepare_chrom_genome:
+#     input:
+#         genome = GENOME
+#     output:
+#         os.path.join(DIR, 'chr{CHROM}.fa')
+#     shell:
+#         '{SAMTOOLS} faidx {input.genome} {CHR_PREFIX}{wildcards.CHROM} > {output};'
