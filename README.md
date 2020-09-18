@@ -34,15 +34,20 @@ The levioSAM software tracks the "edits" between a pair of genomes using a VCF f
 Please refer to the [levioSAM github page](https://github.com/alshai/levioSAM) to install the software.
 
 
-## Running reference flow with pre-built indexes
+## Running reference flow with pre-built RandFlow-LD or RandFlow-LD-26 indexes
+
+We hosted pre-built [RandFlow-LD (22GB)](https://genome-idx.s3.amazonaws.com/bt/flow/randflow_ld.tar.gz) and [RandFlow-LD-26 (96GB)](https://genome-idx.s3.amazonaws.com/bt/flow/randflow_ld_26.tar.gz) indexes.
+Script `src/download_prebuilt_indexes.sh` helps to download the RandFlow-LD indexes, including an indexed major-allele reference and 5 indexed superpop references.
 
 ```
 sh src/download_prebuilt_indexes.sh
+# Run `sh src/download_prebuilt_indexes.sh randflow_ld_26` to download pre-built RandFlow-LD-26 indexes.
 cd snakemake
 snakemake -j 32
 ```
 
-Before executing the Snakemake pipeline, it is recommended to perform a dry-run `snakemake -np` to preview the scheduling plan. The option `-j` specifies the number of threads used, which is set to 32 in the above example.
+Before executing the Snakemake pipeline, it is recommended to perform a dry-run `snakemake -np` to preview the scheduling plan. 
+The option `-j` specifies the number of threads used, which is set to 32 in the above example.
 
 By default, a directory called `run` will be created under `snakemake` and all the results will be under it. 
 The alignment results are aggrelated as a single SAM file, which uses the GRCh38 coordinate system by default.
