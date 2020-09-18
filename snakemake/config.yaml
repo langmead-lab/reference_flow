@@ -1,8 +1,14 @@
 # Genomic reads to process
+ALN_MODE : 'single-end'
 READS1 : '../test/SRR622457_1-1k.fastq'
+READS2 : ''
 
 # Name of the tested sample
 INDIV : 'test'
+
+# Experiment label that will become prefixes for many files
+# For example, 'wg' (stands for whole-genome), 'chr1'
+EXP_LABEL : 'wg'
 
 # Directory where the outputs will be put
 DIR: 'run'
@@ -34,6 +40,10 @@ VCF_SUFFIX : '.shapeit2_integrated_snvindels_v2a_27022019.GRCh38.phased.vcf.gz'
 
 # 1KG super populations used to build second pass population genomes
 GROUP : ['EUR', 'AMR', 'EAS', 'SAS', 'AFR'] 
+POP_LEVEL : 'superpop'
+# Replace with the below if using a second-pass reference set based on 1KG populations
+# GROUP : ['CHB', 'JPT', 'CHS', 'CDX', 'KHV', 'CEU', 'TSI', 'FIN', 'GBR', 'IBS', 'YRI', 'LWK', 'GWD', 'MSL', 'ESN', 'ASW', 'ACB', 'MXL', 'PUR', 'CLM', 'PEL', 'GIH', 'PJL', 'BEB', 'STU', 'ITU']
+# POP_LEVEL : 'pop'
 
 # mapping quality cutoff to split read into committed and deferred groups
 ALN_MAPQ_THRSD : '10' 
@@ -73,9 +83,9 @@ LENGTH_MAP : '../resources/GRCh38.length_map'
 CHROM_MAP : '../resources/GRCh38.chrom_map'
 
 # Paths of software
-BCFTOOLS : 'bcftools' # there is a bug with `bcftools consensus` in v1.9, so we recommend using the latest dev version
+BCFTOOLS : 'bcftools'
 SAMTOOLS : 'samtools'
-LEVIOSAM : '../levioSAM/leviosam'
+LEVIOSAM : 'leviosam'
 PYTHON : 'python'
 DIR_SCRIPTS : '../src'
 

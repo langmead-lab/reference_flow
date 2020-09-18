@@ -1,10 +1,10 @@
 import os
 import pandas as pd
 
-configfile: 'test_pe.yaml'
+# configfile: 'test_pe.yaml'
 # configfile: 'test_se.yaml'
 # configfile: "config_local.yaml"
-# configfile: "config.yaml"
+configfile: "config.yaml"
 # configfile: "config_mouse.yaml"
 
 ''' Load from config '''
@@ -47,9 +47,6 @@ THREADS = config['THREADS']
 RAND_SEED = config['RAND_SEED']
 ''''''
 
-# Prefixes for filtered VCFs
-# PREFIX_VCF_F = os.path.join(DIR, '{CHROM}_filtered')
-
 # Bowtie 2 index extensions
 IDX_ITEMS = ['1', '2', '3', '4', 'rev.1', 'rev.2']
 
@@ -61,7 +58,7 @@ DIR_MAJOR = os.path.join(DIR, 'major')
 # Prefixes and directory paths for population reference contruction and indexing
 DIR_POP_GENOME = os.path.join(DIR, 'pop_genome/')
 POP_DIRNAME = 'thrds{0}_S{1}_b{2}_ld{3}'.format(POP_THRSD, POP_STOCHASTIC, POP_BLOCK_SIZE, POP_USE_LD)
-WG_POP_GENOME_SUFFIX = EXP_LABEL + '-{POP_LEVEL}_{GROUP}_' + POP_DIRNAME
+WG_POP_GENOME_SUFFIX = EXP_LABEL + '-' + POP_LEVEL + '_{GROUP}_' + POP_DIRNAME
 DIR_POP_GENOME_BLOCK = os.path.join(DIR_POP_GENOME, POP_DIRNAME + '/')
 DIR_POP_GENOME_BLOCK_IDX = os.path.join(DIR_POP_GENOME_BLOCK, 'indexes/')
 
@@ -115,14 +112,12 @@ rule filter_vcf:
         vcf = os.path.join(DIR_VCF, VCF_PREFIX + '{CHROM}' + VCF_SUFFIX),
         chrom_map = CHROM_MAP
     output:
-        # vcf = PREFIX_VCF_F + '.vcf'
         vcf = temp(os.path.join(DIR, '{CHROM}_filtered.vcf'))
     shell:
         # Take PASS variants
         # Does not remove mnps, since they will be needed for constructing personalized reference genome, 
         # and will be removed when building major and refflow references.
         '{BCFTOOLS} view -r {wildcards.CHROM} -c 1 -f PASS {input.vcf} | {BCFTOOLS} annotate --rename-chrs {input.chrom_map} -o {output.vcf}'
-        # '{BCFTOOLS} view -r {wildcards.CHROM} -c 1 -f PASS -V mnps,other {input.vcf} | {BCFTOOLS} annotate --rename-chrs {input.chrom_map} -o {output.vcf}'
 
 rule aggregate_vcf:
     input:
@@ -131,11 +126,3 @@ rule aggregate_vcf:
         vcf = os.path.join(DIR, EXP_LABEL + '_filtered.vcf.gz')
     shell:
         '{BCFTOOLS} concat -O z -o {output.vcf} {input.vcf}'
-
-# rule prepare_chrom_genome:
-#     input:
-#         genome = GENOME
-#     output:
-#         os.path.join(DIR, 'chr{CHROM}.fa')
-#     shell:
-#         '{SAMTOOLS} faidx {input.genome} {CHR_PREFIX}{wildcards.CHROM} > {output};'

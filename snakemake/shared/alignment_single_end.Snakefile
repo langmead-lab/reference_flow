@@ -3,7 +3,6 @@
 rule align_to_major:
     input:
         reads1 = READS1,
-        reads2 = READS2,
         idx = expand(
             os.path.join(DIR, 'major/indexes/' + EXP_LABEL + '-maj.{idx}.bt2'),
             idx = IDX_ITEMS)
