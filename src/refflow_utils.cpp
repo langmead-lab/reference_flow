@@ -12,10 +12,11 @@ int8_t seq_comp_table[16] = { 0, 8, 4, 12, 2, 10, 6, 14, 1, 9, 5, 13, 3, 11, 7, 
 
 struct refflow_utils_opts{
     std::string cmd = "";
-    std::string sam_fn = "";
-    std::string output_prefix = "";
+    bool write_hq_to_stdout = false;
     int split_strategy = SPLIT_OPT;
     int mapq_threshold = 0;
+    std::string sam_fn = "";
+    std::string output_prefix = "";
 };
 
 
@@ -62,21 +63,37 @@ void write_fq_from_bam(bam1_t* aln, std::ofstream& out_fq){
  * 
  */
 void fetch_low_mapq(refflow_utils_opts args){
+    // Read raw SAM file.
     samFile* sam_fp = (args.sam_fn == "")?
         sam_open("-", "r") :
         sam_open(args.sam_fn.data(), "r");
-
-    std::cerr << args.sam_fn.data() << "\n";
-
     bam_hdr_t* hdr = sam_hdr_read(sam_fp);
-    // Read two reads in one iteration to for the paired-end mode.
-    bam1_t* aln1 = bam_init1(), * aln2 = bam_init1();
+
+    // High-quality alignments (SAM).
+    std::string out_sam_hq_fn = args.output_prefix + "-high_qual.sam";
+    samFile* out_sam_hq_fp = (args.write_hq_to_stdout)?
+        sam_open("-", "w") :
+        sam_open(out_sam_hq_fn.data(), "w");
+    int write_hdr = sam_hdr_write(out_sam_hq_fp, hdr);
+    // Low-quality alignments (SAM).
+    std::string out_sam_lq_fn = args.output_prefix + "-low_qual.sam";
+    samFile* out_sam_lq_fp = sam_open(out_sam_lq_fn.data(), "w");
+    write_hdr = sam_hdr_write(out_sam_lq_fp, hdr);
+    // Low-quality reads (paired-end FQ).
     std::ofstream out_fq1, out_fq2;
     out_fq1.open(args.output_prefix + "-R1.fq");
     out_fq2.open(args.output_prefix + "-R2.fq");
+
+    // Read two reads in one iteration to for the paired-end mode.
+    bam1_t* aln1 = bam_init1(), * aln2 = bam_init1();
     while(true){
         if (sam_read1(sam_fp, hdr, aln1) < 0 || sam_read1(sam_fp, hdr, aln2) < 0)
             break;
+        // Check read names: they should be identical.
+        if (strcmp(bam_get_qname(aln1), bam_get_qname(aln2)) != 0){
+            std::cerr << "[ERROR] Input SAM file should be sorted by read name.\n";
+            exit(1);
+        }
         bam1_core_t c_aln1 = aln1->core, c_aln2 = aln2->core;
 
         bool is_low_quality = false;
@@ -96,9 +113,21 @@ void fetch_low_mapq(refflow_utils_opts args){
                 write_fq_from_bam(aln1, out_fq2);
                 write_fq_from_bam(aln2, out_fq1);
             }
+            if (sam_write1(out_sam_lq_fp, hdr, aln1) < 0 || sam_write1(out_sam_lq_fp, hdr, aln2) < 0){
+                std::cerr << "[ERROR] Failure when writing low-qualiy alignments to SAM.\n";
+                exit(1);
+            }
+        }
+        else{
+            if (sam_write1(out_sam_hq_fp, hdr, aln1) < 0 || sam_write1(out_sam_hq_fp, hdr, aln2) < 0){
+                std::cerr << "[ERROR] Failure when writing high-qualiy alignments to SAM.\n";
+                exit(1);
+            }
         }
     }
     sam_close(sam_fp);
+    sam_close(out_sam_hq_fp);
+    sam_close(out_sam_lq_fp);
     out_fq1.close();
     out_fq2.close();
 }
@@ -118,12 +147,18 @@ int main(int argc, char** argv) {
     refflow_utils_opts args;
     args.cmd = make_cmd(argc, argv);
     static struct option long_options[]{
+        {"write_hq_to_stdout", no_argument, 0, 'd'},
         {"sam_fn", required_argument, 0, 's'},
-        {"output_prefix", required_argument, 0, 'o'}
+        {"output_prefix", required_argument, 0, 'o'},
+        {"split_strategy", required_argument, 0, 'p'},
+        {"mapq_threshold", required_argument, 0, 'q'}
     };
     int long_idx = 0;
-    while((c = getopt_long(argc, argv, "ho:p:q:s:", long_options, &long_idx)) != -1){
+    while((c = getopt_long(argc, argv, "dho:p:q:s:", long_options, &long_idx)) != -1){
         switch (c){
+            case 'd':
+                args.write_hq_to_stdout = true;
+                break;
             case 'o':
                 args.output_prefix = optarg;
                 break;
@@ -141,10 +176,11 @@ int main(int argc, char** argv) {
                 exit(1);
         }
     }
-    if (!strcmp(argv[optind], "fetch_low_mapq")){
-        std::cerr << "fetch_low_mapq\n";
+    if (!strcmp(argv[optind], "split_sam")){
+        std::cerr << "[split_sam] Split a SAM file into high- and low-quality sub SAM files and " <<
+            "generate FASTQ files for low-quality reads.\n";
         fetch_low_mapq(args);
-        // TODO
+        std::cerr << "[split_sam] Completed.\n";
     } else if (!strcmp(argv[optind], "merge")){
         // TODO
         std::cerr << "Merge is not yet supported.\n";
