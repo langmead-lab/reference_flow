@@ -228,7 +228,7 @@ std::vector<std::tuple<A, B, C, D>> zip(const std::vector<A> &a,
     for(int i = 0; i < a.size(); ++i){
         zipped.push_back(std::make_tuple(a[i], b[i], c[i], d[i]));
     }
-    return (zipped);
+    return zipped;
 }
 
 
@@ -272,25 +272,21 @@ std::vector<std::string> read_file_as_vector(std::string list_fn){
         }
     }
     read_list.close();
-    return (list);
+    return list;
 }
 
 /* Rank a set of alignments.
  * Order by: is_proper_pair > score > MAPQ
  */
-int rank_alns(const std::vector<bool>& pair_indicators,
-              const std::vector<int>& scores,
-              const std::vector<int>& mapqs){
+int select_best_aln(const std::vector<bool>& pair_indicators,
+                    const std::vector<int>& scores,
+                    const std::vector<int>& mapqs,
+                    int& num_tied_best){
     int vec_size = pair_indicators.size();
     std::vector<int> ranks(vec_size);
     std::iota(ranks.begin(), ranks.end(), 0);
 
     std::vector<std::tuple<int, int, bool, int>> zipped = zip(mapqs, scores, pair_indicators, ranks);
-    // for(int i = 0; i < vec_size; i++){
-    //     std::cerr << std::get<1>(zipped[i]) << " ";
-    // }
-    // std::cerr << "\n";
-    // Sort the vector of tuples.
     std::sort(zipped.begin(), zipped.end(),
         [&](const auto& a, const auto& b)
         {
@@ -298,13 +294,13 @@ int rank_alns(const std::vector<bool>& pair_indicators,
                    (std::get<1>(a) != std::get<1>(b))? (std::get<1>(a) > std::get<1>(b)) :
                    (std::get<0>(a) > std::get<0>(b));
         });
-    int num_ties = vec_size;
+    num_tied_best = vec_size;
     for (int i = 0; i < vec_size - 1; i++){
         // Compare elements in tuples (ranks should be excluded so cannot simply compare tuples).
         if (std::get<2>(zipped[i]) != std::get<2>(zipped[i+1]) ||
             std::get<1>(zipped[i]) != std::get<1>(zipped[i+1]) ||
             std::get<0>(zipped[i]) != std::get<0>(zipped[i+1])){
-            num_ties = i + 1;
+            num_tied_best = i + 1;
             break;
         }
     }
@@ -313,73 +309,32 @@ int rank_alns(const std::vector<bool>& pair_indicators,
     for(int i = 0; i < vec_size; i++){
         ranks.push_back(std::get<3>(zipped[i]));
     }
-    // std::cerr << "\n";
-    // if (num_ties != vec_size){
-    //     std::cerr << "num_ties " << num_ties << "\n";
-    //     for (auto rs : ranks) { std::cerr << rs << ' ';};
-    //     std::cerr << "\n";
-    // }
-    std::random_shuffle(ranks.begin(), ranks.begin() + num_ties, myrandom);
-    // if (num_ties != vec_size){
-    //     for (auto rs : ranks) { std::cerr << rs << ' ';};
-    //     std::cerr << "\n";
-    //     std::cerr << "best: " << ranks[0] << "\n";
+    std::random_shuffle(ranks.begin(), ranks.begin() + num_tied_best, myrandom);
 
-    //     std::cerr << "Enter 0 to exit\n";
-    //     int cin_a;
-    //     std::cin >> cin_a;
-    //     if (cin_a == 0) exit(0);
-    // }
-    return (ranks[0]);
+    return ranks[0];
 }
 
-/* Rank a set of alignments.
- * Order by: is_proper_pair > score > MAPQ
- */
-//int rank_alns(const std::vector<int>& scores,
-//              const std::vector<int>& mapqs,
-//              const std::vector<bool>& pair_indicators){
-//    std::vector<int> rank(scores.size());
-//    std::iota(rank.begin(), rank.end(), 0);
-//
-//    auto sort_mapqs = sort_permutation(mapqs, std::greater<int>());
-//    auto rank_sorted_mapq = apply_permutation(rank, sort_mapqs);
-//    std:: cerr << "sort by mapq\n";
-//    for (auto rs : rank_sorted_mapq) { std::cerr << rs << ' ';};
-//    std:: cerr << "\n";
-//
-//    auto sort_scores = sort_permutation(scores, std::greater<int>());
-//    auto rank_sorted_mapq_score = apply_permutation(rank_sorted_mapq, sort_scores);
-//    std:: cerr << "sort by score\n";
-//    for (auto rs : rank_sorted_mapq_score) { std::cerr << rs << ' ';};
-//    std:: cerr << "\n";
-//
-//    auto sort_pind = sort_permutation(pair_indicators, std::greater<int>());
-//    auto rank_sorted_all = apply_permutation(rank_sorted_mapq_score, sort_pind);
-//    std:: cerr << "sort by pairness\n";
-//    for (auto rs : rank_sorted_all) { std::cerr << rs << ' ';};
-//    std:: cerr << "\n";
-//
-//    int num_ties = rank_sorted_all.size();
-//    for (int i = 0; i < rank_sorted_all.size() - 1; i++){
-//        int actual_idx = rank_sorted_all[i];
-//        int next_idx = rank_sorted_all[i + 1];
-//        if (pair_indicators[actual_idx] != pair_indicators[next_idx] ||
-//            scores[actual_idx] != scores[next_idx] ||
-//            mapqs[actual_idx] != mapqs[next_idx]){
-//            num_ties = i;
-//            break;
-//        }
-//    }
-//    std::cerr << "num_ties = " << num_ties << "\n";
-//    for (auto r : rank) { std::cerr << r << ' ';};
-//    std:: cerr << "\n";
-//    std::random_shuffle(rank_sorted_all.begin(), rank_sorted_all.begin() + num_ties, myrandom);
-//    for (auto rs : rank_sorted_all) { std::cerr << rs << ' ';};
-//    std:: cerr << "\n";
-//    return (rank_sorted_all[0]);
-//}
 
+int select_best_aln_single_end(const std::vector<bam1_t*>& aln1s){
+    std::vector<int> mapqs, scores;
+    // We don't actually need `pair_indicators` in single-end mode.
+    // Create this to make it easier to re-use the core comparison function.
+    std::vector<bool> pair_indicators;
+    for (int i = 0; i < aln1s.size(); i++){
+        bam1_core_t c_aln1 = aln1s[i]->core;
+        pair_indicators.push_back(true);
+        mapqs.push_back(c_aln1.qual);
+        int score = (c_aln1.flag & BAM_FUNMAP)? INT_MIN :
+                                                bam_aux2i(bam_aux_get(aln1s[i], "AS"));
+        scores.push_back(score);
+    }
+    int num_tied_best;
+    int best_idx = select_best_aln(
+        pair_indicators=pair_indicators, scores=scores,
+        mapqs=mapqs, num_tied_best=num_tied_best);
+
+    return best_idx;
+}
 
 int select_best_aln_paired_end(const std::vector<bam1_t*>& aln1s,
                                const std::vector<bam1_t*>& aln2s,
@@ -401,10 +356,14 @@ int select_best_aln_paired_end(const std::vector<bam1_t*>& aln1s,
             // MERGE_PE_SUM mode sums MAPQ and AS. AS is set to 0 for an unaligned read.
             mapqs.push_back(c_aln1.qual + c_aln2.qual);
             int score = 0;
-            if (!(c_aln1.flag & BAM_FUNMAP))
-                score += bam_aux2i(bam_aux_get(aln1s[i], "AS"));
-            if (!(c_aln2.flag & BAM_FUNMAP))
-                score += bam_aux2i(bam_aux_get(aln2s[i], "AS"));
+            score += (c_aln1.flag & BAM_FUNMAP)? INT_MIN / 2 :
+                                                 bam_aux2i(bam_aux_get(aln1s[i], "AS"));
+            score += (c_aln2.flag & BAM_FUNMAP)? INT_MIN / 2 :
+                                                 bam_aux2i(bam_aux_get(aln2s[i], "AS"));
+            // if (!(c_aln1.flag & BAM_FUNMAP))
+            //     score += bam_aux2i(bam_aux_get(aln1s[i], "AS"));
+            // if (!(c_aln2.flag & BAM_FUNMAP))
+            //     score += bam_aux2i(bam_aux_get(aln2s[i], "AS"));
             scores.push_back(score);
         } else if (merge_pe_mode == MERGE_PE_MAX){
             // MERGE_PE_MAX mode takes max MAPQ and AS.
@@ -423,42 +382,75 @@ int select_best_aln_paired_end(const std::vector<bam1_t*>& aln1s,
             std::cerr << "[Error] Invalid merging mode for paired-end alignments "
                       << merge_pe_mode << "\n";
         }
-        std::cerr << bam_get_qname(aln1s[i]) << " " << scores[i] << " " << mapqs[i] << " " << pair_indicators[i] << "\n";
     }
-    int best_index = rank_alns(pair_indicators=pair_indicators, scores=scores, mapqs=mapqs);
-    return (best_index);
+    int num_tied_best;
+    int best_idx = select_best_aln(
+        pair_indicators=pair_indicators, scores=scores, mapqs=mapqs, num_tied_best=num_tied_best);
+
+    // Log message for debuggin:
+    // if (num_tied_best < aln1s.size()){
+    //     for (int i = 0; i < aln1s.size(); i++)
+    //         std::cout << bam_get_qname(aln1s[i]) << " " << scores[i] << " " << mapqs[i] << " " << pair_indicators[i] << "\n";
+    //     std::cout << "best = " << best_idx << "\n";
+    // }
+    
+    return best_idx;
 }
 
 
 void merge_sam(merge_sam_opts args){
+    if (args.paired_end)
+        std::cerr << "[Paired-end mode]\n";
+    else
+        std::cerr << "[Single-end mode]\n";
+
     std::srand(args.rand_seed);
     std::vector<std::string> sam_fns = read_file_as_vector(args.sam_list);
     std::vector<std::string> ids = read_file_as_vector(args.id_list);
 
-    // Read each SAM file listed in `--sam_list`.
     std::vector<samFile*> sam_fps;
+    std::vector<samFile*> out_sam_fps;
     std::vector<bam_hdr_t*> hdrs;
     std::vector<bam1_t*> aln1s, aln2s;
     for (int i = 0; i < sam_fns.size(); i++){
+        // Read each SAM file listed in `--sam_list`.
         sam_fps.push_back(sam_open(sam_fns[i].data(), "r"));
         hdrs.push_back(sam_hdr_read(sam_fps[i]));
         aln1s.push_back(bam_init1());
-        aln2s.push_back(bam_init1());
+        if (args.paired_end)
+            aln2s.push_back(bam_init1());
+
+        // Create output SAM files.
+        std::string out_fn = args.output_prefix + "-" + ids[i] + ".sam";
+        out_sam_fps.push_back(sam_open(out_fn.data(), "w"));
+        sam_hdr_write(out_sam_fps[i], hdrs[i]);
     }
-    while(true){
-        // Paired-end mode.
-        // Read two reads from each of the SAM files in each iteration.
+    bool end = false;
+    int num_records = 0;
+    while(!end){
+        // If in paired-end mode: read two reads from each of the SAM files in each iteration.
         for (int i = 0; i < sam_fns.size(); i++){
-            if (sam_read1(sam_fps[i], hdrs[i], aln1s[i]) < 0 ||
-                sam_read1(sam_fps[i], hdrs[i], aln2s[i]) < 0)
-                break;
-            // Check read names: they should be identical.
-            if (strcmp(bam_get_qname(aln1s[i]), bam_get_qname(aln2s[i])) != 0){
-                std::cerr << "[Error] SAM file should be sorted by read name.\n";
-                std::cerr << "Mismatched reads: " << bam_get_qname(aln1s[i]) <<
-                             " and " << bam_get_qname(aln2s[i]) << "\n";
-                exit(1);
+            if (args.paired_end){
+                if (sam_read1(sam_fps[i], hdrs[i], aln1s[i]) < 0 ||
+                    sam_read1(sam_fps[i], hdrs[i], aln2s[i]) < 0){
+                    end = true;
+                    break;
+                }
+                // Check read names: they should be identical.
+                if (strcmp(bam_get_qname(aln1s[i]), bam_get_qname(aln2s[i])) != 0){
+                    std::cerr << "[Error] SAM file should be sorted by read name.\n";
+                    std::cerr << "Mismatched reads: " << bam_get_qname(aln1s[i]) <<
+                                 " and " << bam_get_qname(aln2s[i]) << "\n";
+                    exit(1);
+                }
+            } else {
+                if (sam_read1(sam_fps[i], hdrs[i], aln1s[i]) < 0){
+                    end = true;
+                    break;
+                }
             }
+            num_records ++;
+
             // Check if read names from all files are identical.
             if (i > 0)
                 if (strcmp(bam_get_qname(aln1s[0]), bam_get_qname(aln1s[i])) != 0){
@@ -468,8 +460,24 @@ void merge_sam(merge_sam_opts args){
                     exit(1);
                 }
         }
-        select_best_aln_paired_end(aln1s, aln2s, MERGE_PE_SUM);
+        if (args.paired_end){
+            int best_idx = select_best_aln_paired_end(aln1s, aln2s, MERGE_PE_SUM);
+            sam_write1(out_sam_fps[best_idx], hdrs[best_idx], aln1s[best_idx]);
+            sam_write1(out_sam_fps[best_idx], hdrs[best_idx], aln2s[best_idx]);
+        } else {
+            int best_idx = select_best_aln_single_end(aln1s);
+            sam_write1(out_sam_fps[best_idx], hdrs[best_idx], aln1s[best_idx]);
+        }
     }
+    for (int i = 0; i < sam_fns.size(); i++){
+        bam_destroy1(aln1s[i]);
+        if (args.paired_end)
+            bam_destroy1(aln2s[i]);
+    }
+    if (args.paired_end)
+        std::cerr << "[Completed] Processed " << num_records << " pairs of reads\n";
+    else
+        std::cerr << "[Completed] Processed " << num_records << " reads\n";
 }
 
 
@@ -484,10 +492,14 @@ void merge_sam_main(int argc, char** argv){
         {"rand_seed", required_argument, 0, 'r'},
         {"decoy_list", required_argument, 0, 'd'},
         {"decoy_threshold", required_argument, 0, 'p'},
+        {"paired_end", no_argument, 0, 'm'}
     };
     int long_idx = 0;
-    while((c = getopt_long(argc, argv, "d:i:o:p:r:s:", long_options, &long_idx)) != -1){
+    while((c = getopt_long(argc, argv, "md:i:o:p:r:s:", long_options, &long_idx)) != -1){
         switch (c){
+            case 'm':
+                args.paired_end = true;
+                break;
             case 'd':
                 args.decoy_list = optarg;
                 break;
@@ -515,13 +527,12 @@ void merge_sam_main(int argc, char** argv){
 }
 
 int main(int argc, char** argv) {
-    if (!strcmp(argv[optind], "split_sam")){
-        std::cerr << "[split_sam] Split a SAM file into high- and low-quality sub SAM files and " <<
+    if (!strcmp(argv[optind], "split")){
+        std::cerr << "[split] Split a SAM file into high- and low-quality sub SAM files and " <<
             "generate FASTQ files for low-quality reads.\n";
         split_sam_main(argc, argv);
-        std::cerr << "[split_sam] Completed.\n";
+        std::cerr << "[split] Completed.\n";
     } else if (!strcmp(argv[optind], "merge")){
-        // TODO
         merge_sam_main(argc, argv);
     }
     return 0;
