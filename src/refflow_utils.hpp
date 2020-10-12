@@ -17,6 +17,7 @@ const int MERGE_PE_MAX = 1;
 // const int MERGE_PE_PAIR_TLEN_THRESHOLD = 2000;
 
 struct merge_sam_opts{
+    bool paired_end = false;
     std::string cmd = "";
     int decoy_threshold = 0;
     int rand_seed = 0;
