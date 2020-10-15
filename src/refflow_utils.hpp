@@ -10,6 +10,7 @@ struct split_sam_opts{
     int mapq_threshold = 0;
     std::string sam_fn = "";
     std::string output_prefix = "";
+    std::string output_ext = "";
 };
 
 const int MERGE_PE_SUM = 0;
