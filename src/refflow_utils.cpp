@@ -88,11 +88,24 @@ void split_sam(split_sam_opts args){
     // Read two reads in one iteration to for the paired-end mode.
     bam1_t* aln1 = bam_init1(), * aln2 = bam_init1();
     while(true){
-        if (sam_read1(sam_fp, hdr, aln1) < 0 || sam_read1(sam_fp, hdr, aln2) < 0)
-            break;
+        while(true) {
+            auto read1 = sam_read1(sam_fp, hdr, aln1);
+            if (read1 < 0){
+                std::cerr << "[Error] Failed to read an alignment from " << args.sam_fn << "\n";
+            }
+            else if (!aln1->core.flag & BAM_FSUPPLEMENTARY) break;
+        }
+        while(true) {
+            auto read2 = sam_read1(sam_fp, hdr, aln2);
+            if (read2 < 0){
+                std::cerr << "[Error] Failed to read an alignment from " << args.sam_fn << "\n";
+            }
+            else if (!aln2->core.flag & BAM_FSUPPLEMENTARY) break;
+        }
         // Check read names: they should be identical.
         if (strcmp(bam_get_qname(aln1), bam_get_qname(aln2)) != 0){
             std::cerr << "[Error] Input SAM file should be sorted by read name.\n";
+            std::cerr << bam_get_qname(aln1) << " " << bam_get_qname(aln2) << "\n";
             exit(1);
         }
         bam1_core_t c_aln1 = aln1->core, c_aln2 = aln2->core;
