@@ -10,9 +10,7 @@
 #include <refflow_utils.hpp>
 
 
-/* Fetch alignments that are unapped or mapped with low MAPQ.
- * 
- */
+/* Fetch alignments that are unapped or mapped with low MAPQ. */
 void split_sam(split_sam_opts args){
     // Read raw SAM file.
     samFile* sam_fp = (args.sam_fn == "")?
@@ -47,6 +45,7 @@ void split_sam(split_sam_opts args){
         // Check read names: they should be identical.
         if (strcmp(bam_get_qname(aln1), bam_get_qname(aln2)) != 0){
             std::cerr << "[Error] Input SAM file should be sorted by read name.\n";
+            std::cerr << "This can be done using `samtools sort -n`\n";
             std::cerr << bam_get_qname(aln1) << " " << bam_get_qname(aln2) << "\n";
             exit(1);
         }
@@ -127,11 +126,13 @@ void split_sam_main(int argc, char** argv){
                 exit(1);
             default:
                 std::cerr << "Ignoring option " << c << " \n";
+                split_sam_help();
                 exit(1);
         }
     }
     if (args.output_ext != "sam" && args.output_ext != "bam"){
         std::cerr << "[Error] Unsupported output extension " << args.output_ext << "\n";
+        split_sam_help();
         exit(1);
     }
     split_sam(args);
