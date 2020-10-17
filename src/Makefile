@@ -1,15 +1,14 @@
 PRGNAME=refflow_utils
 CXX=g++
 CXX_FLAGS=--std=c++14 -lpthread
-INC=
 LIB=-lhts
 
-DEPS = refflow_utils.hpp split_sam.hpp
-OBJ = refflow_utils.o split_sam.o
+INC = split_sam.hpp merge_sam.hpp refflow_utils.hpp
+OBJ = split_sam.o merge_sam.o refflow_utils.o
 
 all: $(PRGNAME)
 
-%.o: %.cpp $(DEPS)
+%.o: %.cpp $(INC)
 	$(CXX) -c -o $@ $< $(LIB) $(CXX_FLAGS)
 
 refflow_utils: $(OBJ)

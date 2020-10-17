@@ -1,6 +1,5 @@
 #ifndef SPLIT_SAM_H__
 #define SPLIT_SAM_H__
-#include <string.h>
 
 const int SPLIT_OPT = 0;
 const int SPLIT_PES = 1;
@@ -15,10 +14,6 @@ struct split_sam_opts{
     std::string output_prefix = "";
     std::string output_ext = "sam";
 };
-
-void split_sam(split_sam_opts args);
-
-void split_sam_main(int argc, char** argv);
 
 static void split_sam_help(){
     std::cerr << "\n";
@@ -37,6 +32,10 @@ static void split_sam_help(){
     std::cerr << "  -d          Set to write high-quality alignments to stdout\n";
     std::cerr << "\n";
 }
+
+void split_sam(split_sam_opts args);
+
+void split_sam_main(int argc, char** argv);
 
 
 #endif /* SPLIT_SAM_H__ */

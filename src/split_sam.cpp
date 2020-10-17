@@ -5,6 +5,7 @@
 
 #include <getopt.h>
 #include <htslib/sam.h>
+#include <string.h>
 
 #include <split_sam.hpp>
 #include <refflow_utils.hpp>
