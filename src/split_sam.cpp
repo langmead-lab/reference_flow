@@ -11,6 +11,67 @@
 #include <refflow_utils.hpp>
 
 
+/* Return the read, reverse complemented if necessary
+   Adapted from: https://github.com/samtools/samtools/blob/develop/bam_fastq.c 
+*/
+static std::string get_read(const bam1_t *rec){
+    int len = rec->core.l_qseq + 1;
+    char *seq = (char *)bam_get_seq(rec);
+    std::string read = "";
+
+    for (int n = 0; n < rec->core.l_qseq; n++) {
+        if (rec->core.flag & BAM_FREVERSE)
+            read.append(1, seq_nt16_str[seq_comp_table[bam_seqi(seq, n)]]);
+        else
+            read.append(1, seq_nt16_str[bam_seqi(seq, n)]);
+    }
+    if (rec->core.flag & BAM_FREVERSE)
+        std::reverse(read.begin(), read.end());
+    return read;
+}
+
+
+/* Read an aln from a SAM file. Skip records carrying flags specified by an exclusion list.
+ * This is a wrapper around sam_read1() from htslib. The flags to skip is passed in a vector<int>.
+ */
+int sam_read1_selective(samFile* sam_fp, bam_hdr_t* hdr, bam1_t* aln,
+                        const std::vector<int>& exclude_flag){
+    // Return -1 if cannot read from sam_fp.
+    if (sam_read1(sam_fp, hdr, aln) < 0) return -1;
+    // Read until aln is not in the exclusion list.
+    while(true){
+        bool keep = true;
+        for (int i = 0; i < exclude_flag.size(); i++){
+            if (aln->core.flag & exclude_flag[i]){
+                keep = false;
+                break;
+            }
+        }
+        if (keep) return 0;
+        if (sam_read1(sam_fp, hdr, aln) < 0) return -1;
+    }
+}
+
+
+/* Write a bam1_t object to a FASTQ record.
+ */
+void write_fq_from_bam(bam1_t* aln, std::ofstream& out_fq){
+    out_fq << "@" << bam_get_qname(aln) << "\n";
+    out_fq << get_read(aln) << "\n+\n";
+    std::string qual_seq("");
+    uint8_t* qual = bam_get_qual(aln);
+    if (qual[0] == 255) qual_seq = "*";
+    else {
+        for (auto i = 0; i < aln->core.l_qseq; ++i) {
+            qual_seq += (char) (qual[i] + 33);
+        }
+    }
+    if (aln->core.flag & BAM_FREVERSE)
+        std::reverse(qual_seq.begin(), qual_seq.end());
+    out_fq << qual_seq << "\n";
+}
+
+
 /* Fetch alignments that are unapped or mapped with low MAPQ. */
 void split_sam(split_sam_opts args){
     // Read raw SAM file.
