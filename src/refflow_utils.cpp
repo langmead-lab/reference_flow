@@ -3,10 +3,12 @@
 #include <iostream>
 
 #include <getopt.h>
+#include <string.h>
 
+#include <add_aux.hpp>
 #include <merge_sam.hpp>
-#include <refflow_utils.hpp>
 #include <split_sam.hpp>
+#include <refflow_utils.hpp>
 
 
 int main(int argc, char** argv) {
@@ -15,13 +17,17 @@ int main(int argc, char** argv) {
      */
     double start_cputime = std::clock();
     auto start_walltime = std::chrono::system_clock::now();
-    if (!strcmp(argv[optind], "split")){
+    if (!strcmp(argv[optind], "add_aux")) {
+        std::cerr << "[add_aux] Add an AUX tag for all alignments in a SAM/BAM file\n";
+        add_aux_main(argc, argv);
+        std::cerr << "[add_aux] Completed.\n";
+    } else if (!strcmp(argv[optind], "split")) {
         std::cerr <<
             "[split] Split a SAM/BAM file into high- and low-quality sub SAM/BAM files and " <<
             "generate FASTQ files for low-quality reads.\n";
         split_sam_main(argc, argv);
         std::cerr << "[split] Completed.\n";
-    } else if (!strcmp(argv[optind], "merge")){
+    } else if (!strcmp(argv[optind], "merge")) {
         std::cerr << "[merge] Merge a list of SAM/BAM files that contain the same set of reads " <<
             "in the same order.\n";
         std::cerr << "        Best-ranked alignments will be selected in separate SAM/BAM " <<
@@ -32,8 +38,9 @@ int main(int argc, char** argv) {
         std::cerr << "Subcommand " << argv[optind] << " not found.\n";
         std::cerr << "\n";
         std::cerr << "Currently supported subcommands:\n";
-        std::cerr << " - split: split alignments by MAPQ\n";
-        std::cerr << " - merge: select best alignments from a set of plural alignments\n";
+        std::cerr << " - add_aux: add AUX tag for alignments\n";
+        std::cerr << " - split:   split alignments by MAPQ\n";
+        std::cerr << " - merge:   select best alignments from a set of plural alignments\n";
         std::cerr << "\n";
         std::cerr << "Please try `refflow_utils <subcommand> -h` to see usages\n";
         std::cerr << "\n";

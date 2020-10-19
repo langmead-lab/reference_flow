@@ -14,11 +14,5 @@ static std::string make_cmd(int argc, char** argv) {
     return cmd;
 }
 
-static std::string get_read(const bam1_t *rec);
-
-void write_fq_from_bam(bam1_t* aln, std::ofstream& out_fq);
-
-int sam_read1_selective(samFile* sam_fp, bam_hdr_t* hdr, bam1_t* aln,
-                        const std::vector<int>& exclude_flag);
 
 #endif /* REFFLOW_UTILS_H__ */
