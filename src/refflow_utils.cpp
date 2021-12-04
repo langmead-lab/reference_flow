@@ -5,10 +5,10 @@
 #include <getopt.h>
 #include <string.h>
 
-#include <add_aux.hpp>
-#include <merge_sam.hpp>
-#include <split_sam.hpp>
-#include <refflow_utils.hpp>
+#include "add_aux.hpp"
+#include "merge_sam.hpp"
+#include "split_sam.hpp"
+#include "refflow_utils.hpp"
 
 
 int main(int argc, char** argv) {

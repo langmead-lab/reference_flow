@@ -3,8 +3,8 @@
 #include <getopt.h>
 #include <htslib/sam.h>
 
-#include <add_aux.hpp>
-#include <refflow_utils.hpp>
+#include "add_aux.hpp"
+#include "refflow_utils.hpp"
 
 
 /* Parse a raw AUX tag into right htslib format.

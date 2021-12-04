@@ -7,8 +7,8 @@
 #include <htslib/sam.h>
 #include <string.h>
 
-#include <split_sam.hpp>
-#include <refflow_utils.hpp>
+#include "split_sam.hpp"
+#include "refflow_utils.hpp"
 
 
 /* Return the read, reverse complemented if necessary
