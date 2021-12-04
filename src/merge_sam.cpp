@@ -7,8 +7,8 @@
 #include <limits.h>
 #include <string.h>
 
-#include <merge_sam.hpp>
-#include <refflow_utils.hpp>
+#include "merge_sam.hpp"
+#include "refflow_utils.hpp"
 
 /* Fill the zipped vector with pairs consisting of the corresponding elements of
  * a, b, c and d. (This assumes that the vectors have equal length)
@@ -67,6 +67,7 @@ std::vector<std::string> read_file_as_vector(std::string list_fn) {
     return list;
 }
 
+
 /* Rank a set of alignments.
  * Order by: is_proper_pair > score > MAPQ
  */
@@ -117,7 +118,7 @@ int select_best_aln_single_end(const std::vector<bam1_t*>& aln1s) {
         pair_indicators.push_back(true);
         mapqs.push_back(c_aln1.qual);
         int score = (c_aln1.flag & BAM_FUNMAP)? INT_MIN :
-                                                bam_aux2i(bam_aux_get(aln1s[i], "AS"));
+                                                -bam_aux2i(bam_aux_get(aln1s[i], "NM"));
         scores.push_back(score);
     }
     int num_tied_best;
@@ -127,6 +128,7 @@ int select_best_aln_single_end(const std::vector<bam1_t*>& aln1s) {
 
     return best_idx;
 }
+
 
 int select_best_aln_paired_end(const std::vector<bam1_t*>& aln1s,
                                const std::vector<bam1_t*>& aln2s,
@@ -139,19 +141,14 @@ int select_best_aln_paired_end(const std::vector<bam1_t*>& aln1s,
     for (int i = 0; i < aln1s.size(); i++) {
         bam1_core_t c_aln1 = aln1s[i]->core, c_aln2 = aln2s[i]->core;
         pair_indicators.push_back(c_aln1.isize != 0);
-        // if (c_aln1.size == 0) {
-        //     // Set MAPQ and AS to 0 for an unaligned read.
-        //     maps.push_back(0);
-        //     scores.push_back(0);
-        // } else 
         if (merge_pe_mode == MERGE_PE_SUM) {
             // MERGE_PE_SUM mode sums MAPQ and AS. AS is set to 0 for an unaligned read.
             mapqs.push_back(c_aln1.qual + c_aln2.qual);
             int score = 0;
             score += (c_aln1.flag & BAM_FUNMAP)? INT_MIN / 2 :
-                                                 bam_aux2i(bam_aux_get(aln1s[i], "AS"));
+                                                 -bam_aux2i(bam_aux_get(aln1s[i], "NM"));
             score += (c_aln2.flag & BAM_FUNMAP)? INT_MIN / 2 :
-                                                 bam_aux2i(bam_aux_get(aln2s[i], "AS"));
+                                                 -bam_aux2i(bam_aux_get(aln2s[i], "NM"));
             scores.push_back(score);
         } else if (merge_pe_mode == MERGE_PE_MAX) {
             // MERGE_PE_MAX mode takes max MAPQ and AS.
@@ -161,10 +158,10 @@ int select_best_aln_paired_end(const std::vector<bam1_t*>& aln1s,
                 mapqs.push_back(c_aln2.qual);
             int score = INT_MIN;
             if (!(c_aln1.flag & BAM_FUNMAP))
-                score = bam_aux2i(bam_aux_get(aln1s[i], "AS"));
+                score = -bam_aux2i(bam_aux_get(aln1s[i], "NM"));
             if (!(c_aln2.flag & BAM_FUNMAP))
-                score = (score > bam_aux2i(bam_aux_get(aln2s[i], "AS")))?
-                    score : bam_aux2i(bam_aux_get(aln2s[i], "AS"));
+                score = (score > -bam_aux2i(bam_aux_get(aln2s[i], "NM")))?
+                    score : -bam_aux2i(bam_aux_get(aln2s[i], "NM"));
             scores.push_back(score);
         } else{
             std::cerr << "[Error] Invalid merging mode for paired-end alignments "
@@ -175,13 +172,6 @@ int select_best_aln_paired_end(const std::vector<bam1_t*>& aln1s,
     int best_idx = select_best_aln(
         pair_indicators=pair_indicators, scores=scores, mapqs=mapqs, num_tied_best=num_tied_best);
 
-    // Log message for debuggin:
-    // if (num_tied_best < aln1s.size()) {
-    //     for (int i = 0; i < aln1s.size(); i++)
-    //         std::cout << bam_get_qname(aln1s[i]) << " " << scores[i] << " " << mapqs[i] << " " << pair_indicators[i] << "\n";
-    //     std::cout << "best = " << best_idx << "\n";
-    // }
-    
     return best_idx;
 }
 
@@ -204,28 +194,54 @@ void merge_sam(merge_sam_opts args) {
         // Read each SAM file listed in `--sam_list`.
         sam_fps.push_back(sam_open(sam_fns[i].data(), "r"));
         hdrs.push_back(sam_hdr_read(sam_fps[i]));
+        if (sam_hdr_nref(hdrs[i]) != sam_hdr_nref(hdrs[0])) {
+            std::cerr << "[W::merge_sam] Num REF in `" << sam_fns[i] << "` differs with `"
+                      << sam_fns[0] << "`. Please check.\n";
+        }
         aln1s.push_back(bam_init1());
         if (args.paired_end)
             aln2s.push_back(bam_init1());
 
-        // Create output SAM files.
-        std::string out_fn = args.output_prefix + "-" + ids[i] + ".sam";
-        out_sam_fps.push_back(sam_open(out_fn.data(), "w"));
+        std::string out_fn = args.output_prefix + "-" + ids[i] + ".bam";
+        out_sam_fps.push_back(sam_open(out_fn.data(), "wb"));
         if (sam_hdr_write(out_sam_fps[i], hdrs[i]) < 0) {
-            std::cerr << "[Error] Failed to write to file.\n";
+            std::cerr << "[E::merge_sam] Failed to write SAM header to file " << out_fn << "\n";
             exit(-1);
         }
     }
+    std::string out_fn = args.output_prefix + ".bam";
+    samFile* out_fp = sam_open(out_fn.data(), "wb");
+    if (sam_hdr_write(out_fp, hdrs[0])) {
+        std::cerr << "[E::merge_sam] Failed to write SAM header to file " << out_fn << "\n";
+        exit(-1);
+    }
     bool end = false;
     int num_records = 0;
-    while(!end) {
+    while (!end) {
         // If in paired-end mode: read two reads from each of the SAM files in each iteration.
         for (int i = 0; i < sam_fns.size(); i++) {
             if (args.paired_end) {
-                if (sam_read1(sam_fps[i], hdrs[i], aln1s[i]) < 0 ||
-                    sam_read1(sam_fps[i], hdrs[i], aln2s[i]) < 0) {
-                    end = true;
-                    break;
+                while (1) {
+                    int read1 = sam_read1(sam_fps[i], hdrs[i], aln1s[i]);
+                    if (read1 < 0) {
+                        end = true;
+                        break;
+                    }
+                    if (!(aln1s[i]->core.flag & BAM_FSECONDARY) && 
+                        !(aln1s[i]->core.flag & BAM_FSUPPLEMENTARY)) {
+                        break;
+                    }
+                }
+                while (1) {
+                    int read2 = sam_read1(sam_fps[i], hdrs[i], aln2s[i]);
+                    if (read2 < 0) {
+                        end = true;
+                        break;
+                    }
+                    if (!(aln2s[i]->core.flag & BAM_FSECONDARY) &&
+                        !(aln2s[i]->core.flag & BAM_FSUPPLEMENTARY)) {
+                        break;
+                    }
                 }
                 // Check read names: they should be identical.
                 if (strcmp(bam_get_qname(aln1s[i]), bam_get_qname(aln2s[i])) != 0) {
@@ -235,7 +251,11 @@ void merge_sam(merge_sam_opts args) {
                                  " and " << bam_get_qname(aln2s[i]) << "\n";
                     exit(1);
                 }
+                if (end) {
+                    break;
+                }
             } else {
+                // Single-end mode
                 if (sam_read1(sam_fps[i], hdrs[i], aln1s[i]) < 0) {
                     end = true;
                     break;
@@ -252,16 +272,30 @@ void merge_sam(merge_sam_opts args) {
                     exit(1);
                 }
         }
+
+        if (end)
+            break;
         if (args.paired_end) {
             int best_idx = select_best_aln_paired_end(aln1s, aln2s, MERGE_PE_SUM);
             if (sam_write1(out_sam_fps[best_idx], hdrs[best_idx], aln1s[best_idx]) < 0 ||
-                sam_write1(out_sam_fps[best_idx], hdrs[best_idx], aln2s[best_idx]) ) {
+                sam_write1(out_sam_fps[best_idx], hdrs[best_idx], aln2s[best_idx]) < 0) {
                 std::cerr << "[Error] Failed to write to file.\n";
+                std::cerr << bam_get_qname(aln1s[best_idx]);
+                exit(-1);
+            }
+            if (sam_write1(out_fp, hdrs[0], aln1s[best_idx]) < 0 ||
+                sam_write1(out_fp, hdrs[0], aln2s[best_idx]) < 0) {
+                std::cerr << "[E::merge_sam] Failed to write to file.\n";
+                std::cerr << bam_get_qname(aln1s[best_idx]);
                 exit(-1);
             }
         } else {
             int best_idx = select_best_aln_single_end(aln1s);
             if (sam_write1(out_sam_fps[best_idx], hdrs[best_idx], aln1s[best_idx]) < 0) {
+                std::cerr << "[Error] Failed to write to file.\n";
+                exit(-1);
+            }
+            if (sam_write1(out_fp, hdrs[0], aln1s[best_idx]) < 0) {
                 std::cerr << "[Error] Failed to write to file.\n";
                 exit(-1);
             }
@@ -272,6 +306,14 @@ void merge_sam(merge_sam_opts args) {
         if (args.paired_end)
             bam_destroy1(aln2s[i]);
     }
+    for (auto& s: sam_fps) {
+        sam_close(s);
+    }
+    for (auto& s: out_sam_fps) {
+        sam_close(s);
+    }
+    sam_close(out_fp);
+
     if (args.paired_end)
         std::cerr << "[Completed] Processed " << num_records << " pairs of reads\n";
     else
