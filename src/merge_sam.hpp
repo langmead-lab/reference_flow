@@ -15,10 +15,11 @@ struct merge_sam_opts{
     std::string cmd = "";
     int decoy_threshold = 0;
     int rand_seed = 0;
-    std::string sam_list = "";
-    std::string id_list = "";
+    // std::string sam_list = "";
+    // std::string id_list = "";
     std::string decoy_list = "";
     std::string output_prefix = "";
+    std::vector<std::string> inputs;
 };
 
 static void merge_sam_help(){

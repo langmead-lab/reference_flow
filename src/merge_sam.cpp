@@ -2,6 +2,7 @@
 #include <iostream>
 #include <fstream>
 #include <numeric>
+#include <regex>
 
 #include <getopt.h>
 #include <limits.h>
@@ -50,22 +51,22 @@ void unzip(const std::vector<std::tuple<A, B, C, D>> &zipped,
 }
 
 
-std::vector<std::string> read_file_as_vector(std::string list_fn) {
-    std::vector<std::string> list;
-    std::ifstream read_list(list_fn.c_str());
-    if (!read_list) {
-        std::cerr << "[Error] Cannot open file " << list_fn << "\n";
-        exit(1);
-    }
-    std::string line;
-    while (std::getline(read_list, line)) {
-        if (line.size() > 0) {
-            list.push_back(line);
-        }
-    }
-    read_list.close();
-    return list;
-}
+// std::vector<std::string> read_file_as_vector(std::string list_fn) {
+//     std::vector<std::string> list;
+//     std::ifstream read_list(list_fn.c_str());
+//     if (!read_list) {
+//         std::cerr << "[Error] Cannot open file " << list_fn << "\n";
+//         exit(1);
+//     }
+//     std::string line;
+//     while (std::getline(read_list, line)) {
+//         if (line.size() > 0) {
+//             list.push_back(line);
+//         }
+//     }
+//     read_list.close();
+//     return list;
+// }
 
 
 /* Rank a set of alignments.
@@ -183,11 +184,29 @@ void merge_sam(merge_sam_opts args) {
         std::cerr << "[Single-end mode]\n";
 
     std::srand(args.rand_seed);
-    std::vector<std::string> sam_fns = read_file_as_vector(args.sam_list);
-    std::vector<std::string> ids = read_file_as_vector(args.id_list);
+    std::vector<std::string> sam_fns;
+    std::vector<std::string> ids;
+    // std::vector<std::string> sam_fns = read_file_as_vector(args.sam_list);
+    // std::vector<std::string> ids = read_file_as_vector(args.id_list);
+    for (auto& s: args.inputs) {
+        std::regex regexz(":");
+        std::vector<std::string> vec(
+            std::sregex_token_iterator(s.begin(), s.end(), regexz, -1),
+            std::sregex_token_iterator());
+        if (vec.size() != 2) {
+            std::cerr << "[E::merge_sam] Invalid format: " << s << "\n";
+            exit(1);
+        }
+        ids.push_back(vec[0]);
+        sam_fns.push_back(vec[1]);
+    }
+    for (int i = 0; i < sam_fns.size(); i++) {
+        std::cerr << "File " << i << ": ";
+        std::cerr << sam_fns[i] << " (" << ids[i] << ")\n";
+    }
 
     std::vector<samFile*> sam_fps;
-    std::vector<samFile*> out_sam_fps;
+    // std::vector<samFile*> out_sam_fps;
     std::vector<bam_hdr_t*> hdrs;
     std::vector<bam1_t*> aln1s, aln2s;
     for (int i = 0; i < sam_fns.size(); i++) {
@@ -202,18 +221,18 @@ void merge_sam(merge_sam_opts args) {
         if (args.paired_end)
             aln2s.push_back(bam_init1());
 
-        std::string out_fn = args.output_prefix + "-" + ids[i] + ".bam";
-        out_sam_fps.push_back(sam_open(out_fn.data(), "wb"));
-        if (sam_hdr_write(out_sam_fps[i], hdrs[i]) < 0) {
-            std::cerr << "[E::merge_sam] Failed to write SAM header to file " << out_fn << "\n";
-            exit(-1);
-        }
+        // std::string out_fn = args.output_prefix + "-" + ids[i] + ".bam";
+        // out_sam_fps.push_back(sam_open(out_fn.data(), "wb"));
+        // if (sam_hdr_write(out_sam_fps[i], hdrs[i]) < 0) {
+        //     std::cerr << "[E::merge_sam] Failed to write SAM header to file " << out_fn << "\n";
+        //     exit(-1);
+        // }
     }
     std::string out_fn = args.output_prefix + ".bam";
     samFile* out_fp = sam_open(out_fn.data(), "wb");
     if (sam_hdr_write(out_fp, hdrs[0])) {
         std::cerr << "[E::merge_sam] Failed to write SAM header to file " << out_fn << "\n";
-        exit(-1);
+        exit(1);
     }
     bool end = false;
     int num_records = 0;
@@ -277,12 +296,18 @@ void merge_sam(merge_sam_opts args) {
             break;
         if (args.paired_end) {
             int best_idx = select_best_aln_paired_end(aln1s, aln2s, MERGE_PE_SUM);
-            if (sam_write1(out_sam_fps[best_idx], hdrs[best_idx], aln1s[best_idx]) < 0 ||
-                sam_write1(out_sam_fps[best_idx], hdrs[best_idx], aln2s[best_idx]) < 0) {
-                std::cerr << "[Error] Failed to write to file.\n";
-                std::cerr << bam_get_qname(aln1s[best_idx]);
-                exit(-1);
-            }
+            bam_aux_append(
+                aln1s[best_idx], "RF", 'Z', ids[best_idx].length() + 1,
+                reinterpret_cast<uint8_t*>(const_cast<char*>(ids[best_idx].c_str())));
+            bam_aux_append(
+                aln2s[best_idx], "RF", 'Z', ids[best_idx].length() + 1,
+                reinterpret_cast<uint8_t*>(const_cast<char*>(ids[best_idx].c_str())));
+            // if (sam_write1(out_sam_fps[best_idx], hdrs[best_idx], aln1s[best_idx]) < 0 ||
+            //     sam_write1(out_sam_fps[best_idx], hdrs[best_idx], aln2s[best_idx]) < 0) {
+            //     std::cerr << "[Error] Failed to write to file.\n";
+            //     std::cerr << bam_get_qname(aln1s[best_idx]);
+            //     exit(-1);
+            // }
             if (sam_write1(out_fp, hdrs[0], aln1s[best_idx]) < 0 ||
                 sam_write1(out_fp, hdrs[0], aln2s[best_idx]) < 0) {
                 std::cerr << "[E::merge_sam] Failed to write to file.\n";
@@ -291,10 +316,13 @@ void merge_sam(merge_sam_opts args) {
             }
         } else {
             int best_idx = select_best_aln_single_end(aln1s);
-            if (sam_write1(out_sam_fps[best_idx], hdrs[best_idx], aln1s[best_idx]) < 0) {
-                std::cerr << "[Error] Failed to write to file.\n";
-                exit(-1);
-            }
+            bam_aux_append(
+                aln1s[best_idx], "RF", 'Z', ids[best_idx].length() + 1,
+                reinterpret_cast<uint8_t*>(const_cast<char*>(ids[best_idx].c_str())));
+            // if (sam_write1(out_sam_fps[best_idx], hdrs[best_idx], aln1s[best_idx]) < 0) {
+            //     std::cerr << "[Error] Failed to write to file.\n";
+            //     exit(-1);
+            // }
             if (sam_write1(out_fp, hdrs[0], aln1s[best_idx]) < 0) {
                 std::cerr << "[Error] Failed to write to file.\n";
                 exit(-1);
@@ -309,9 +337,9 @@ void merge_sam(merge_sam_opts args) {
     for (auto& s: sam_fps) {
         sam_close(s);
     }
-    for (auto& s: out_sam_fps) {
-        sam_close(s);
-    }
+    // for (auto& s: out_sam_fps) {
+    //     sam_close(s);
+    // }
     sam_close(out_fp);
 
     if (args.paired_end)
@@ -326,8 +354,9 @@ void merge_sam_main(int argc, char** argv) {
     merge_sam_opts args;
     args.cmd = make_cmd(argc, argv);
     static struct option long_options[]{
-        {"sam_list", required_argument, 0, 's'},
-        {"id_list", required_argument, 0, 'i'},
+        {"inputs", required_argument, 0, 's'},
+        // {"sam_list", required_argument, 0, 's'},
+        // {"id_list", required_argument, 0, 'i'},
         {"output_prefix", required_argument, 0, 'o'},
         {"rand_seed", required_argument, 0, 'r'},
         {"decoy_list", required_argument, 0, 'd'},
@@ -335,7 +364,7 @@ void merge_sam_main(int argc, char** argv) {
         {"paired_end", no_argument, 0, 'm'}
     };
     int long_idx = 0;
-    while ((c = getopt_long(argc, argv, "hmd:i:o:p:r:s:", long_options, &long_idx)) != -1) {
+    while ((c = getopt_long(argc, argv, "hmd:o:p:r:s:", long_options, &long_idx)) != -1) {
         switch (c) {
             case 'm':
                 args.paired_end = true;
@@ -343,9 +372,9 @@ void merge_sam_main(int argc, char** argv) {
             case 'd':
                 args.decoy_list = optarg;
                 break;
-            case 'i':
-                args.id_list = optarg;
-                break;
+            // case 'i':
+            //     args.id_list = optarg;
+            //     break;
             case 'o':
                 args.output_prefix = optarg;
                 break;
@@ -356,7 +385,8 @@ void merge_sam_main(int argc, char** argv) {
                 args.rand_seed = atoi(optarg);
                 break;
             case 's':
-                args.sam_list = optarg;
+                args.inputs.push_back(optarg);
+                // args.sam_list = optarg;
                 break;
             case 'h':
                 merge_sam_help();
