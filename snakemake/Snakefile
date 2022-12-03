@@ -39,7 +39,11 @@ FAMILY = config['FAMILY']
 SPOP = config['SPOP']
 BCFTOOLS = config['BCFTOOLS']
 SAMTOOLS = config['SAMTOOLS']
+BGZIP = config['BGZIP']
+TABIX = config['TABIX']
 LEVIOSAM = config['LEVIOSAM']
+LEVIOSAM2 = config['LEVIOSAM2']
+CHAINTOOLS = config['CHAINTOOLS']
 PYTHON = config['PYTHON']
 DIR_SCRIPTS = config['DIR_SCRIPTS']
 
@@ -110,18 +114,16 @@ rule all:
 rule filter_vcf:
     input:
         vcf = os.path.join(DIR_VCF, VCF_PREFIX + '{CHROM}' + VCF_SUFFIX),
-        chrom_map = CHROM_MAP
     output:
-        vcf = temp(os.path.join(DIR, '{CHROM}_filtered.vcf'))
+        vcf = temp(os.path.join(DIR, '{CHROM}_filtered.vcf.gz'))
     shell:
-        # Take PASS variants
         # Does not remove mnps, since they will be needed for constructing personalized reference genome, 
         # and will be removed when building major and refflow references.
-        '{BCFTOOLS} view -r {wildcards.CHROM} -c 1 -f PASS {input.vcf} | {BCFTOOLS} annotate --rename-chrs {input.chrom_map} -o {output.vcf}'
+        '{BCFTOOLS} view -r chr{wildcards.CHROM} -c 1 {input.vcf} | {BGZIP} > {output.vcf}'
 
 rule aggregate_vcf:
     input:
-        vcf = expand(os.path.join(DIR, '{CHROM}_filtered.vcf'), CHROM = CHROM)
+        vcf = expand(os.path.join(DIR, '{CHROM}_filtered.vcf.gz'), CHROM = CHROM)
     output:
         vcf = os.path.join(DIR, EXP_LABEL + '_filtered.vcf.gz')
     shell:

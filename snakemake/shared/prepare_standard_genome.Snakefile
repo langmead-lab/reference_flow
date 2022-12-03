@@ -7,11 +7,22 @@ rule build_major:
         vcfgz = os.path.join(DIR, 'major/' + EXP_LABEL + '-maj.vcf.gz'),
         vcfgz_idx = os.path.join(DIR, 'major/' + EXP_LABEL + '-maj.vcf.gz.csi'),
         out_genome = os.path.join(DIR, 'major/' + EXP_LABEL + '-maj.fa'),
+        out_genome_fai = os.path.join(DIR, 'major/' + EXP_LABEL + '-maj.fa.fai'),
+        inverted_chain = temp(os.path.join(DIR, 'major/' + EXP_LABEL + '-maj.inverted.chain'))
     shell:
         '{BCFTOOLS} view -O z -q 0.5000001 -G -o {output.vcf} -v snps,indels -m2 -M2 {input.vcf};'
-        'bgzip -c {output.vcf} > {output.vcfgz};'
+        '{BGZIP} -c {output.vcf} > {output.vcfgz};'
         '{BCFTOOLS} index {output.vcfgz};'
-        '{BCFTOOLS} consensus -f {input.genome} -o {output.out_genome} {output.vcfgz}'
+        '{BCFTOOLS} consensus -c {output.inverted_chain} -f {input.genome} -o {output.out_genome} {output.vcfgz};'
+        '{SAMTOOLS} faidx {output.out_genome}'
+
+rule invert_major_chain:
+    input:
+        inverted_chain = os.path.join(DIR, 'major/' + EXP_LABEL + '-maj.inverted.chain')
+    output:
+        chain = os.path.join(DIR, 'major/' + EXP_LABEL + '-maj.chain')
+    shell:
+        '{PYTHON} {CHAINTOOLS}/src/invert.py -c {input.inverted_chain} -o {output.chain}'
 
 rule build_major_index:
     input:
@@ -33,3 +44,4 @@ rule check_standard_genomes:
             idx = IDX_ITEMS),
     output:
         touch(temp(os.path.join(DIR, 'prepare_standard_genome.done')))
+

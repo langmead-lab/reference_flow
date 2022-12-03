@@ -5,14 +5,14 @@ and sort the reads.
 rule lift_major_highq:
     input:
         sam = os.path.join(DIR_FIRST_PASS, EXP_LABEL + '-major-mapqgeq{}.sam'.format(ALN_MAPQ_THRSD)),
-        lft = os.path.join(DIR_MAJOR, EXP_LABEL + '-major.lft')
+        clft = os.path.join(DIR_MAJOR, EXP_LABEL + '-major.clft')
     output:
         os.path.join(DIR_FIRST_PASS, EXP_LABEL + '-major-mapqgeq{}-liftover.sam'.format(ALN_MAPQ_THRSD))
     params:
         os.path.join(DIR_FIRST_PASS, EXP_LABEL + '-major-mapqgeq{}-liftover'.format(ALN_MAPQ_THRSD))
     threads: THREADS
     run:
-        shell('{LEVIOSAM} lift -a {input.sam} -l {input.lft} -p {params} -t {threads}')
+        shell('{LEVIOSAM2} lift -a {input.sam} -C {input.clft} -p {params} -t {threads}')
 
 #: Refflow -- second pass
 rule lift_refflow_secondpass_and_merge:
@@ -23,11 +23,11 @@ rule lift_refflow_secondpass_and_merge:
         second_sam_path = os.path.join(
             DIR_SECOND_PASS,
             EXP_LABEL + '-major-{}-{}.merge_paths'.format(ALN_MAPQ_THRSD, POP_DIRNAME)),
-        lft_pop = expand(os.path.join(
+        clft_pop = expand(os.path.join(
             DIR_POP_GENOME, POP_DIRNAME + '/' +
-            EXP_LABEL + '-' + POP_LEVEL + '_{GROUP}_' + POP_DIRNAME + '.lft'),
+            EXP_LABEL + '-' + POP_LEVEL + '_{GROUP}_' + POP_DIRNAME + '.clft'),
             GROUP = GROUP),
-        lft_maj = os.path.join(DIR_MAJOR, EXP_LABEL + '-major.lft'),
+        clft_maj = os.path.join(DIR_MAJOR, EXP_LABEL + '-major.clft'),
     output:
         lfted_refflow_sam = os.path.join(DIR_SECOND_PASS,
             EXP_LABEL + '-refflow-{}-{}-liftover.sam'.format(ALN_MAPQ_THRSD, POP_DIRNAME)),
@@ -60,16 +60,16 @@ rule lift_refflow_secondpass_and_merge:
                 '/2ndpass-{}-liftover'.format(list_group[i]))
             if list_group[i] == 'maj':
                 sys.stderr.write('sam={}, lft = {}\n'.format(sam, input.lft_maj))
-                shell('{LEVIOSAM} lift -a {sam} -l {input.lft_maj} -p {prefix} -t {threads};')
+                shell('{LEVIOSAM2} lift -a {sam} -C {input.clft_maj} -p {prefix} -t {threads};')
                 # Append reads to all-in-one lifted SAM.
                 shell('grep -hv "^@" {prefix}.sam >> {output.lfted_refflow_sam};')
             elif list_group[i] in GROUP:
-                for lft in input.lft_pop:
+                for lft in input.clft_pop:
                     pop = os.path.basename(lft)
                     if lft.count(list_group[i]) > 0:
                         break
                 sys.stderr.write('sam={}, lft = {}\n'.format(sam, lft))
-                shell('{LEVIOSAM} lift -a {sam} -l {lft} -p {prefix} -t {threads};')
+                shell('{LEVIOSAM2} lift -a {sam} -C {clft} -p {prefix} -t {threads};')
                 # Append reads to all-in-one lifted SAM.
                 shell('grep -hv "^@" {prefix}.sam >> {output.lfted_refflow_sam};')
 

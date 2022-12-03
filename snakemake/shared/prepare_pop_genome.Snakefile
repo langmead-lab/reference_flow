@@ -58,7 +58,7 @@ rule filter_pop_vcf:
         shell('{BCFTOOLS} view -i "{filt}" \
             -v snps,indels {input.vcf_gz} > {output.vcf};')
 
-rule build_pop_genome:
+rule construct_pop_vcf:
     input:
         vcf = os.path.join(
             DIR_POP_GENOME,
@@ -67,15 +67,15 @@ rule build_pop_genome:
     output:
         os.path.join(
             DIR_POP_GENOME_BLOCK,
-            WG_POP_GENOME_SUFFIX + '.fa'
-        ),
-        os.path.join(
-            DIR_POP_GENOME_BLOCK,
             WG_POP_GENOME_SUFFIX + '.var'
         ),
         os.path.join(
             DIR_POP_GENOME_BLOCK,
-            WG_POP_GENOME_SUFFIX + '.vcf'
+            WG_POP_GENOME_SUFFIX + '.vcf.gz'
+        ),
+        os.path.join(
+            DIR_POP_GENOME_BLOCK,
+            WG_POP_GENOME_SUFFIX + '.vcf.gz.tbi'
         )
     params:
         prefix = os.path.join(
@@ -88,18 +88,91 @@ rule build_pop_genome:
                 --ref {GENOME} --vcf {input.vcf} \
                 --out-prefix {params.prefix} \
                 --include-indels --stochastic -rs {RAND_SEED} \
-                --block-size {POP_BLOCK_SIZE} --ld')
+                --block-size {POP_BLOCK_SIZE} --ld --var-only')
         elif POP_STOCHASTIC == 1:
             shell('{PYTHON} {DIR_SCRIPTS}/update_genome.py \
                 --ref {GENOME} --vcf {input.vcf} \
                 --out-prefix {params.prefix} \
                 --include-indels --stochastic -rs {RAND_SEED} \
-                --block-size {POP_BLOCK_SIZE}')
+                --block-size {POP_BLOCK_SIZE} --var-only')
         else:
             shell('{PYTHON} {DIR_SCRIPTS}/update_genome.py \
                 --ref {GENOME} --vcf {input.vcf} \
                 --out-prefix {params.prefix} \
-                --include-indels')
+                --include-indels --var-only')
+        shell('{BGZIP} {params.prefix}.vcf')
+        shell('{TABIX} {params.prefix}.vcf.gz')
+
+rule build_pop_genome:
+    input:
+        vcf = os.path.join(
+            DIR_POP_GENOME_BLOCK,
+            WG_POP_GENOME_SUFFIX + '.vcf.gz'
+        )
+    output:
+        fasta = os.path.join(
+            DIR_POP_GENOME_BLOCK,
+            WG_POP_GENOME_SUFFIX + '.fa'
+        ),
+        fai = os.path.join(
+            DIR_POP_GENOME_BLOCK,
+            WG_POP_GENOME_SUFFIX + '.fa.fai'
+        ),
+        inverted_chain = temp(os.path.join(
+            DIR_POP_GENOME_BLOCK,
+            WG_POP_GENOME_SUFFIX + '.inverted.chain'
+        )),
+    shell:
+        '{BCFTOOLS} consensus -f {GENOME} -c {output.inverted_chain} {input.vcf} > {output.fasta};'
+        '{SAMTOOLS} faidx {output.fasta}'
+
+rule invert_pop_chain:
+    input:
+        inverted_chain = os.path.join(
+            DIR_POP_GENOME_BLOCK,
+            WG_POP_GENOME_SUFFIX + '.inverted.chain'
+        )
+    output:
+        chain = os.path.join(
+            DIR_POP_GENOME_BLOCK,
+            WG_POP_GENOME_SUFFIX + '.chain'
+        )
+    shell:
+        '{PYTHON} {CHAINTOOLS}/src/invert.py -c {input.inverted_chain} -o {output.chain}'
+
+rule leviosam2_index_chain_major:
+     input:
+         chain = os.path.join(DIR, 'major/' + EXP_LABEL + '-maj.chain'),
+         fai = os.path.join(DIR, 'major/' + EXP_LABEL + '-maj.fa.fai'),
+     output:
+         clft = os.path.join(DIR_MAJOR, EXP_LABEL + '-major.clft')
+     params:
+         prefix = os.path.join(DIR_MAJOR, EXP_LABEL + '-major')
+     shell:
+         '{LEVIOSAM2} index -c {input.chain} -F {input.fai} -p {params.prefix}'
+
+rule leviosam2_index_chain_pop:
+    input:
+        chain = os.path.join(
+            DIR_POP_GENOME_BLOCK,
+            WG_POP_GENOME_SUFFIX + '.chain'
+        ),
+        fai = os.path.join(
+            DIR_POP_GENOME_BLOCK,
+            WG_POP_GENOME_SUFFIX + '.fa.fai'
+        ),
+    output:
+        clft = os.path.join(
+            DIR_POP_GENOME_BLOCK,
+            WG_POP_GENOME_SUFFIX + '.clft'
+        )
+    params:
+        prefix = os.path.join(
+            DIR_POP_GENOME_BLOCK,
+            WG_POP_GENOME_SUFFIX
+        )
+    shell:
+        '{LEVIOSAM2} index -c {input.chain} -F {input.fai} -p {params.prefix};'
 
 rule build_pop_genome_index:
     input:
@@ -122,38 +195,7 @@ rule check_pop_genome:
         expand(
             DIR_POP_GENOME_BLOCK_IDX + WG_POP_GENOME_SUFFIX + '.{IDX_ITEMS}.bt2',
             GROUP=GROUP, IDX_ITEMS=IDX_ITEMS, POP_LEVEL=POP_LEVEL
-        )
+        ),
     output:
         touch(temp(os.path.join(DIR, 'prepare_pop_genome.done')))
-
-
-'''
-Rules for building indexes for liftover.
-'''
-rule leviosam_serialize_major:
-    input:
-        vcf_major = os.path.join(DIR, 'major/' + EXP_LABEL + '-maj.vcf'),
-        length_map = LENGTH_MAP
-    output:
-        lft = os.path.join(DIR_MAJOR, EXP_LABEL + '-major.lft')
-    params:
-        os.path.join(DIR_MAJOR, EXP_LABEL + '-major')
-    shell:
-        '{LEVIOSAM} serialize -v {input.vcf_major} -p {params} -k {input.length_map}'
-
-rule leviosam_serialize_pop_genome:
-    input:
-        vcf = os.path.join(DIR_POP_GENOME, POP_DIRNAME + '/' +
-            EXP_LABEL + '-' + POP_LEVEL + '_{GROUP}_' + POP_DIRNAME  + '.vcf'),
-        length_map = LENGTH_MAP
-    output:
-        lft = os.path.join(
-            DIR_POP_GENOME, POP_DIRNAME + '/' +
-            EXP_LABEL + '-' + POP_LEVEL +'_{GROUP}_' + POP_DIRNAME + '.lft')
-    params:
-        os.path.join(
-            DIR_POP_GENOME, POP_DIRNAME + '/' +
-            EXP_LABEL + '-' + POP_LEVEL +'_{GROUP}_' + POP_DIRNAME)
-    run:
-        shell('{LEVIOSAM} serialize -v {input.vcf} -p {params} -k {input.length_map}')
 
